@@ -1,4 +1,4 @@
-import { config } from './config.js';
+import { config } from './config.js?v=20261103-map1';
 import { demoPlaces, filterPlaces, pickPlaces, normalizedBounds } from './domain.js';
 const $ = id => document.getElementById(id);
 const paths = {
