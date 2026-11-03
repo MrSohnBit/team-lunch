@@ -116,8 +116,11 @@ $('my-location').onclick=()=>{
 function mapError(title,copy){clearTimeout(mapTimer);mapFailed=true;$('map-placeholder').hidden=false;$('map-status-title').textContent=title;$('map-status-copy').textContent=copy;$('map-controls').hidden=true;$('retry-map').hidden=!config.naverClientId;}
 $('retry-map').onclick=()=>window.location.reload();
 window.navermap_authFailure=()=>mapError('지도 연결을 확인하고 있어요','네이버 지도 인증 설정을 확인해야 해요. 메뉴 미리보기는 계속 이용할 수 있어요.');
-window.initNaverMap=()=>{
-  if(mapFailed)return;
+// SDK 3.10.5 can invoke callback before window.naver is exported.
+// Defer initialization until the current SDK script has completed.
+window.initNaverMap=()=>queueMicrotask(initializeNaverMap);
+function initializeNaverMap(){
+  if(mapFailed || map)return;
   try{
     const n=window.naver.maps;
     map=new n.Map('map',{center:new n.LatLng(state.center.lat,state.center.lng),zoom:15,minZoom:7,maxZoom:20,zoomControl:true,zoomControlOptions:{position:n.Position.RIGHT_TOP},scaleControl:true,mapDataControl:true,logoControl:true});
@@ -126,7 +129,7 @@ window.initNaverMap=()=>{
     clearTimeout(mapTimer);$('map-placeholder').hidden=true;$('map-controls').hidden=false;
     new ResizeObserver(()=>{const el=$('map');map.setSize(new n.Size(el.clientWidth,el.clientHeight));}).observe($('map'));
     render();
-  }catch{mapError('지도를 불러오지 못했어요','잠시 후 다시 시도해 주세요. 메뉴 미리보기는 계속 이용할 수 있어요.');}
+  }catch(error){console.error('Naver map initialization failed', error);mapError('지도를 불러오지 못했어요','잠시 후 다시 시도해 주세요. 메뉴 미리보기는 계속 이용할 수 있어요.');}
 };
 function loadMap(){
   if(!config.naverClientId){mapError('네이버 지도를 연결하고 있어요','지도 연결 전에도 아래 예시 메뉴와 필터를 먼저 둘러볼 수 있어요.');return;}
