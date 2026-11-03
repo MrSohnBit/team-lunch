@@ -29,3 +29,12 @@ test('multiple areas survive cookies within size limit and invalid areas are dro
   assert.ok(raw.length<4096);
   assert.deepEqual(sanitizePreferences({version:1,center:state.center,areas:[null,{...b,south:99}]}).areas,[]);
 });
+
+test('five 32-vertex freehand areas and longest query fit cookie and restore',()=>{
+  let raw='';const doc={get cookie(){return raw.split(';')[0]},set cookie(v){raw=v}};
+  const points=Array.from({length:32},(_,i)=>({lat:37.5+.01*Math.sin(i*Math.PI/16),lng:127+.01*Math.cos(i*Math.PI/16)}));
+  const state={center:{lat:37.5,lng:127},radius:2000,category:'샐러드',maxPrice:20000,sort:'distance',query:'🍚'.repeat(100),demo:true,areas:Array.from({length:5},()=>({points}))};
+  assert.ok(writePreferences(state,doc,new URL('https://mrsohnbit.github.io/team-lunch/')));
+  assert.ok(raw.length<4096,`cookie: ${raw.length}`);
+  assert.deepEqual(readPreferences(doc).areas,sanitizePreferences({...state,version:1}).areas);
+});

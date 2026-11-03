@@ -16,3 +16,10 @@ test('multiple areas use union without duplicating overlapping restaurants',()=>
   assert.deepEqual(filterPlaces(places,{...state,maxPrice:10000}).map(p=>p.id),['a']);
   assert.deepEqual(filterPlaces(places,{...state,areas:[state.areas[0]]}).map(p=>p.id),['a']);
 });
+
+test('freehand concave polygon excludes its cutout and includes boundary',()=>{
+  const area={points:[{lat:0,lng:0},{lat:0,lng:3},{lat:1,lng:3},{lat:1,lng:1},{lat:3,lng:1},{lat:3,lng:0}]};
+  const state={center:{lat:0,lng:0},radius:1,areas:[area],category:'전체',maxPrice:null,query:'',sort:'distance'};
+  const points=[{id:'inside',lat:.5,lng:2},{id:'cutout',lat:2,lng:2},{id:'edge',lat:1,lng:2}];
+  assert.deepEqual(new Set(filterPlaces(points,state).map(p=>p.id)),new Set(['inside','edge']));
+});

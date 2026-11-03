@@ -8,6 +8,16 @@ export function normalizedBounds(a, b) {
   return { south: Math.min(a.lat,b.lat), north: Math.max(a.lat,b.lat), west: Math.min(a.lng,b.lng), east: Math.max(a.lng,b.lng) };
 }
 export function insideBounds(p, b) {
+  if (Array.isArray(b.points)) {
+    let inside=false;
+    for(let i=0,j=b.points.length-1;i<b.points.length;j=i++){
+      const a=b.points[j],z=b.points[i];
+      const cross=(p.lng-a.lng)*(z.lat-a.lat)-(p.lat-a.lat)*(z.lng-a.lng);
+      if(Math.abs(cross)<1e-12 && p.lat>=Math.min(a.lat,z.lat)&&p.lat<=Math.max(a.lat,z.lat)&&p.lng>=Math.min(a.lng,z.lng)&&p.lng<=Math.max(a.lng,z.lng))return true;
+      if((a.lat>p.lat)!==(z.lat>p.lat)&&p.lng<(z.lng-a.lng)*(p.lat-a.lat)/(z.lat-a.lat)+a.lng)inside=!inside;
+    }
+    return inside;
+  }
   return p.lat >= b.south && p.lat <= b.north && p.lng >= b.west && p.lng <= b.east;
 }
 export function filterPlaces(places, state) {

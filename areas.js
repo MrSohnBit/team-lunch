@@ -1,80 +1,87 @@
-// Keep map objects separate from serializable search preferences.
+// A screen-space SVG preserves freehand hit-testing, including concave outlines.
 export function createAreaController(map, n, onChange) {
   const items=[];
-  let active=-1;
-  function sync(item){
-    if(item.dragStart)return;
-    const b=item.bounds,nw=new n.LatLng(b.north,b.west),se=new n.LatLng(b.south,b.east);
-    const projection=map.getProjection(),a=projection.fromCoordToOffset(nw),z=projection.fromCoordToOffset(se);
-    item.rectangle.setBounds(new n.LatLngBounds(new n.LatLng(b.south,b.west),new n.LatLng(b.north,b.east)));
-    item.handles[0].setPosition(new n.LatLng(b.south,b.west));
-    item.handles[1].setPosition(new n.LatLng(b.north,b.east));
-    item.mover.setPosition(nw);
-    const width=Math.max(1,Math.abs(z.x-a.x)),height=Math.max(1,Math.abs(z.y-a.y));
-    const number=items.indexOf(item)+1;
-    item.mover.setIcon({content:`<div class="area-move-surface" data-area-number="${number}" style="width:${width}px;height:${height}px"><span class="area-number">${number}</span></div>`,anchor:new n.Point(0,0)});
-    item.mover.setTitle(`영역 ${number} 이동`);
+  let active=-1,drawing=false,gesture=null;
+  const host=document.getElementById('map');
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.classList.add('freehand-layer');host.append(svg);
+  const hint=document.createElement('button');hint.className='freehand-cancel';hint.textContent='그리기 취소';hint.hidden=true;host.append(hint);
+  const emit=()=>onChange(items.map(points=>({points:points.map(p=>({...p}))})),active,drawing);
+  const offset=p=>map.getProjection().fromCoordToOffset(new n.LatLng(p.lat,p.lng));
+  const coord=p=>{const c=map.getProjection().fromOffsetToCoord(new n.Point(p.x,p.y));return {lat:c.lat(),lng:c.lng()};};
+  function point(event){const r=svg.getBoundingClientRect();return {x:event.clientX-r.left,y:event.clientY-r.top};}
+  function path(points){return points.map((p,i)=>`${i?'L':'M'}${p.x},${p.y}`).join(' ')+' Z';}
+  function draw(){
+    svg.replaceChildren();
+    const order=items.map((_,i)=>i).filter(i=>i!==active);if(active>=0)order.push(active);
+    for(const i of order){
+      const pixels=items[i].map(offset),shape=document.createElementNS(svg.namespaceURI,'path');
+      shape.setAttribute('d',path(pixels));shape.setAttribute('fill-rule','evenodd');shape.dataset.area=String(i);
+      shape.setAttribute('class',i===active?'selected':'');svg.append(shape);
+      const label=document.createElementNS(svg.namespaceURI,'text');
+      label.setAttribute('x',pixels[0].x);label.setAttribute('y',pixels[0].y-7);label.textContent=String(i+1);svg.append(label);
+    }
+    if(gesture?.type==='draw'){
+      const preview=document.createElementNS(svg.namespaceURI,'path');preview.setAttribute('d',path(gesture.pixels));preview.classList.add('draft');svg.append(preview);
+    }
+    svg.classList.toggle('drawing',drawing);hint.hidden=!drawing;
   }
-  function paint(){
-    items.forEach((item,i)=>{
-      const selected=i===active;
-      item.rectangle.setOptions({strokeColor:selected?'#315940':'#7b8c78',strokeWeight:selected?3:1,fillOpacity:selected?.18:.10});
-      item.mover.setZIndex(selected?1100:1000+i);
-      item.handles.forEach(h=>{h.setMap(selected?map:null);h.setZIndex(1101);});
-    });
+  function cancel(){
+    if(gesture?.type==='move')items[gesture.index]=gesture.original;
+    if(gesture){map.setOptions('draggable',gesture.draggable);if(svg.hasPointerCapture(gesture.id))svg.releasePointerCapture(gesture.id);}
+    gesture=null;drawing=false;draw();emit();
   }
-  function emit(){onChange(items.map(item=>({...item.bounds})),active);}
-  function select(index){if(!items[index])return;active=index;paint();emit();}
-  function finish(item){
-    if(item.mapDraggable!==undefined)map.setOptions('draggable',item.mapDraggable);
-    item.mapDraggable=undefined;item.dragStart=null;sync(item);emit();
-  }
-  function move(item){
-    if(!item.dragStart)return;
-    const p=item.mover.getPosition(),b=item.dragStart;
-    item.bounds={north:p.lat(),west:p.lng(),south:p.lat()-(b.north-b.south),east:p.lng()+(b.east-b.west)};
-    const r=item.bounds;
-    item.rectangle.setBounds(new n.LatLngBounds(new n.LatLng(r.south,r.west),new n.LatLng(r.north,r.east)));
-    item.handles[0].setPosition(new n.LatLng(r.south,r.west));
-    item.handles[1].setPosition(new n.LatLng(r.north,r.east));
-  }
-  function add(bounds){
+  hint.onclick=cancel;
+  svg.addEventListener('pointerdown',event=>{
+    if(gesture||event.button!==0)return;
+    const index=Number(event.target.dataset.area);
+    if(!drawing&&!Number.isInteger(index))return;
+    event.preventDefault();event.stopPropagation();
+    const start=point(event),draggable=map.getOptions('draggable');map.setOptions('draggable',false);
+    gesture=drawing?{type:'draw',pixels:[start],id:event.pointerId,draggable}:{type:'move',index,start,original:items[index].map(p=>({...p})),pixels:items[index].map(offset),id:event.pointerId,draggable};
+    if(!drawing)active=index;
+    svg.setPointerCapture(event.pointerId);draw();
+  });
+  svg.addEventListener('pointermove',event=>{
+    if(!gesture||gesture.id!==event.pointerId)return;
+    event.preventDefault();event.stopPropagation();const p=point(event);
+    if(gesture.type==='draw'){
+      const last=gesture.pixels.at(-1);if(Math.hypot(last.x-p.x,last.y-p.y)>=4)gesture.pixels.push(p);
+      // Keep the input buffer bounded during a long drawing gesture.
+      if(gesture.pixels.length>1024)gesture.pixels=gesture.pixels.filter((_,i)=>i%2===0);
+    }else items[gesture.index]=gesture.pixels.map(a=>coord({x:a.x+p.x-gesture.start.x,y:a.y+p.y-gesture.start.y}));
+    draw();
+  });
+  svg.addEventListener('pointerup',event=>{
+    if(!gesture||gesture.id!==event.pointerId)return;
+    event.preventDefault();event.stopPropagation();
+    const g=gesture;map.setOptions('draggable',g.draggable);gesture=null;
+    if(svg.hasPointerCapture(event.pointerId))svg.releasePointerCapture(event.pointerId);
+    if(g.type==='draw'){
+      const xs=g.pixels.map(p=>p.x),ys=g.pixels.map(p=>p.y);
+      const twiceArea=Math.abs(g.pixels.reduce((sum,p,i)=>{const q=g.pixels[(i+1)%g.pixels.length];return sum+p.x*q.y-q.x*p.y;},0));
+      if(twiceArea>=120&&g.pixels.length>=3&&Math.max(...xs)-Math.min(...xs)>=15&&Math.max(...ys)-Math.min(...ys)>=15){
+        // At most 32 vertices per area keeps five areas within the cookie budget.
+        const count=Math.min(32,g.pixels.length);
+        items.push(Array.from({length:count},(_,i)=>coord(g.pixels[Math.floor(i*g.pixels.length/count)])));active=items.length-1;drawing=false;
+      }
+    }
+    draw();emit();
+  });
+  svg.addEventListener('pointercancel',cancel);
+  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&(drawing||gesture))cancel();});
+  for(const event of ['bounds_changed','idle','zoom_changed'])n.Event.addListener(map,event,draw);
+  new ResizeObserver(draw).observe(host);
+  function add(area){
     if(items.length>=5)return false;
-    const c=map.getCenter(),lat=c.lat(),lng=c.lng();
-    // Slight offset keeps a newly added area visible at the same map center.
-    const offset=bounds?0:items.length*.0006;
-    const b=bounds??{south:lat-.0015+offset,north:lat+.0015+offset,west:lng-.002+offset,east:lng+.002+offset};
-    const item={bounds:{...b},dragStart:null};
-    item.rectangle=new n.Rectangle({map,bounds:new n.LatLngBounds(new n.LatLng(b.south,b.west),new n.LatLng(b.north,b.east)),fillColor:'#9cbb71'});
-    item.mover=new n.Marker({map,position:c,draggable:true,cursor:'move'});
-    item.handles=[new n.LatLng(b.south,b.west),new n.LatLng(b.north,b.east)].map((position,index)=>{
-      const handle=new n.Marker({map,position,draggable:true,zIndex:1101,title:index?'북동쪽 꼭짓점':'남서쪽 꼭짓점',icon:{content:'<span class="area-handle"></span>',anchor:new n.Point(12,12)}});
-      n.Event.addListener(handle,'dragend',()=>{
-        const a=item.handles[0].getPosition(),z=item.handles[1].getPosition();
-        item.bounds={south:Math.min(a.lat(),z.lat()),north:Math.max(a.lat(),z.lat()),west:Math.min(a.lng(),z.lng()),east:Math.max(a.lng(),z.lng())};
-        sync(item);emit();
-      });
-      return handle;
-    });
-    items.push(item);active=items.length-1;
-    n.Event.addListener(item.mover,'click',()=>select(items.indexOf(item)));
-    n.Event.addListener(item.mover,'dragstart',()=>{
-      select(items.indexOf(item));item.dragStart={...item.bounds};item.mapDraggable=map.getOptions('draggable');map.setOptions('draggable',false);
-    });
-    n.Event.addListener(item.mover,'drag',()=>move(item));
-    n.Event.addListener(item.mover,'dragend',()=>{move(item);finish(item);});
-    sync(item);paint();emit();return true;
+    if(area){
+      const points=area.points??[{lat:area.south,lng:area.west},{lat:area.north,lng:area.west},{lat:area.north,lng:area.east},{lat:area.south,lng:area.east}];
+      items.push(points.map(p=>({...p})));active=items.length-1;
+    }else drawing=true;
+    draw();emit();return true;
   }
-  function dispose(item){
-    if(item.mapDraggable!==undefined)map.setOptions('draggable',item.mapDraggable);
-    for(const overlay of [item.rectangle,item.mover,...item.handles]){n.Event.clearInstanceListeners(overlay);overlay.setMap(null);}
-  }
-  function remove(){
-    if(active<0)return;
-    dispose(items.splice(active,1)[0]);active=Math.min(active,items.length-1);
-    items.forEach(sync);paint();emit();
-  }
-  function clear(){items.forEach(dispose);items.length=0;active=-1;emit();}
-  n.Event.addListener(map,'zoom_changed',()=>items.forEach(sync));
-  return {add,select,remove,clear};
+  function select(index){if(!items[index])return;cancel();active=index;draw();emit();}
+  function remove(){cancel();if(active<0)return;items.splice(active,1);active=Math.min(active,items.length-1);draw();emit();}
+  function clear(){cancel();items.length=0;active=-1;draw();emit();}
+  return {add,select,remove,clear,cancel};
 }
