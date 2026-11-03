@@ -140,12 +140,16 @@ $('remove-area').onclick=()=>areaController?.remove();
 $('area-list').onclick=event=>{const button=event.target.closest('[data-area-index]');if(button)areaController?.select(Number(button.dataset.areaIndex));};
 $('search-here').onclick=()=>{if(!map||mapFailed)return;locationGeneration++;clearArea();const c=map.getCenter();state.center={lat:c.lat(),lng:c.lng()};$('location-label').textContent='지도에서 선택한 위치';render();toast('이 위치를 기준으로 메뉴를 찾았어요.');};
 $('location').onclick=()=>{locationGeneration++;clearArea();state.center={...config.initialCenter};$('location-label').textContent=config.initialLocationLabel;if(map&&!mapFailed){map.setCenter(new naver.maps.LatLng(state.center.lat,state.center.lng));map.setZoom(15);}render();toast('기본 위치인 서울시청으로 돌아왔어요.');};
+function setLocationBusy(busy){
+  for(const id of ['my-location','map-my-location']){const button=$(id);button.disabled=busy;button.setAttribute('aria-busy',String(busy));}
+}
+$('map-my-location').onclick=()=>$('my-location').click();
 $('my-location').onclick=()=>{
   if(!navigator.geolocation){toast('이 브라우저에서는 위치를 가져올 수 없어요.');return;}
-  const generation=++locationGeneration;$('my-location').disabled=true;
-  navigator.geolocation.getCurrentPosition(position=>{ $('my-location').disabled=false;if(generation!==locationGeneration)return;clearArea();state.center={lat:position.coords.latitude,lng:position.coords.longitude};$('location-label').textContent='내 현재 위치';if(map&&!mapFailed){map.setCenter(new naver.maps.LatLng(state.center.lat,state.center.lng));map.setZoom(15);}render();toast(`현재 위치로 이동했어요. 위치 정확도 약 ${Math.round(position.coords.accuracy)}m`);},error=>{$('my-location').disabled=false;if(generation!==locationGeneration)return;toast(error.code===1?'위치 권한이 꺼져 있어요. 지도에서 위치를 선택해 주세요.':'위치를 가져오지 못했어요. 잠시 후 다시 시도해 주세요.');},{enableHighAccuracy:true,timeout:10000,maximumAge:60000});
+  const generation=++locationGeneration;setLocationBusy(true);
+  navigator.geolocation.getCurrentPosition(position=>{ setLocationBusy(false);if(generation!==locationGeneration)return;clearArea();state.center={lat:position.coords.latitude,lng:position.coords.longitude};$('location-label').textContent='내 현재 위치';if(map&&!mapFailed){map.setCenter(new naver.maps.LatLng(state.center.lat,state.center.lng));map.setZoom(15);}render();toast(`현재 위치로 이동했어요. 위치 정확도 약 ${Math.round(position.coords.accuracy)}m`);},error=>{setLocationBusy(false);if(generation!==locationGeneration)return;toast(error.code===1?'위치 권한이 꺼져 있어요. 지도에서 위치를 선택해 주세요.':'위치를 가져오지 못했어요. 잠시 후 다시 시도해 주세요.');},{enableHighAccuracy:true,timeout:10000,maximumAge:60000});
 };
-function mapError(title,copy){clearTimeout(mapTimer);mapFailed=true;$('map-placeholder').hidden=false;$('map-status-title').textContent=title;$('map-status-copy').textContent=copy;$('map-controls').hidden=true;$('retry-map').hidden=!config.naverClientId;}
+function mapError(title,copy){clearTimeout(mapTimer);mapFailed=true;$('map-placeholder').hidden=false;$('map-status-title').textContent=title;$('map-status-copy').textContent=copy;$('map-controls').hidden=true;$('map-my-location').hidden=true;$('retry-map').hidden=!config.naverClientId;}
 $('retry-map').onclick=()=>window.location.reload();
 window.navermap_authFailure=()=>mapError('지도 연결을 확인하고 있어요','네이버 지도 인증 설정을 확인해야 해요. 메뉴 미리보기는 계속 이용할 수 있어요.');
 // SDK 3.10.5 can invoke callback before window.naver is exported.
@@ -158,7 +162,7 @@ function initializeNaverMap(){
     map=new n.Map('map',{center:new n.LatLng(state.center.lat,state.center.lng),zoom:15,minZoom:7,maxZoom:20,zoomControl:false,scaleControl:true,mapDataControl:true,logoControl:true});
     circle=new n.Circle({map,center:new n.LatLng(state.center.lat,state.center.lng),radius:state.radius,fillColor:'#9cbb71',fillOpacity:.12,strokeColor:'#7b9e58',strokeWeight:1,strokeOpacity:.6});
     centerMarker=new n.Marker({map,position:new n.LatLng(state.center.lat,state.center.lng),title:'검색 기준점',icon:{content:'<span class="center-pin"></span>',anchor:new n.Point(9,9)}});
-    clearTimeout(mapTimer);$('map-placeholder').hidden=true;$('map-controls').hidden=false;
+    clearTimeout(mapTimer);$('map-placeholder').hidden=true;$('map-controls').hidden=false;$('map-my-location').hidden=false;
     new ResizeObserver(()=>{const el=$('map');map.setSize(new n.Size(el.clientWidth,el.clientHeight));}).observe($('map'));
     const restoredAreas=state.areas.map(b=>({...b}));
     areaController=createAreaController(map,n,(areas,active)=>{state.areas=areas;showAreaControls(active);render();});
