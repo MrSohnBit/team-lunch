@@ -146,7 +146,7 @@ function initializeNaverMap(){
   if(mapFailed || map)return;
   try{
     const n=window.naver.maps;
-    map=new n.Map('map',{center:new n.LatLng(state.center.lat,state.center.lng),zoom:15,minZoom:7,maxZoom:20,zoomControl:true,zoomControlOptions:{position:n.Position.RIGHT_TOP},scaleControl:true,mapDataControl:true,logoControl:true});
+    map=new n.Map('map',{center:new n.LatLng(state.center.lat,state.center.lng),zoom:15,minZoom:7,maxZoom:20,zoomControl:false,scaleControl:true,mapDataControl:true,logoControl:true});
     circle=new n.Circle({map,center:new n.LatLng(state.center.lat,state.center.lng),radius:state.radius,fillColor:'#9cbb71',fillOpacity:.12,strokeColor:'#7b9e58',strokeWeight:1,strokeOpacity:.6});
     centerMarker=new n.Marker({map,position:new n.LatLng(state.center.lat,state.center.lng),title:'검색 기준점',icon:{content:'<span class="center-pin"></span>',anchor:new n.Point(9,9)}});
     clearTimeout(mapTimer);$('map-placeholder').hidden=true;$('map-controls').hidden=false;
