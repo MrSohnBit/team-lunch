@@ -2,7 +2,7 @@ import {findPlaces,regionAt,searchCenters,toPlace} from './search-client.js?v=20
 import { createAreaController } from './areas.js?v=20261103-area-save1';
 import { readPreferences, writePreferences } from './preferences.js?v=20261103-area-save1';
 import { config } from './config.js?v=20261103-map1';
-import { filterPlaces, pickPlaces } from './domain.js?v=20261103-area-save1';
+import { filterPlaces, pickPlaces } from './domain.js?v=20261103-random1';
 const $ = id => document.getElementById(id);
 const paths = {
   user:'M20 21v-2a7 7 0 0 0-14 0v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8',
@@ -26,11 +26,12 @@ const money = n => Number.isFinite(n)?`${n.toLocaleString('ko-KR')}원`:'가격 
 const distance = n => n < 1000 ? `${Math.round(n)}m` : `${(n/1000).toFixed(1)}km`;
 let savedPlaces=[];
 try{const data=JSON.parse(localStorage.getItem('team-lunch.saved.real.v1')||'[]');if(Array.isArray(data))savedPlaces=data.map(toPlace).filter(Boolean);}catch{}
+savedPlaces=pickPlaces(savedPlaces,savedPlaces.length);
 let saved=savedPlaces.map(p=>p.id),realPlaces=[],searchStatus='',searchError='',searchKey='',searchTimer,searchAbort,searchGeneration=0;
 const restoredPreferences = readPreferences(document);
 const state = { center: {...config.initialCenter},radius:500,category:'전체',maxPrice:null,query:'',sort:'distance',bounds:null,demo:true,view:'explore', ...restoredPreferences };
 state.areas=restoredPreferences.areas??(restoredPreferences.bounds?[restoredPreferences.bounds]:[]);
-state.bounds=null;state.demo=false;state.maxPrice=null;state.sort='distance';
+state.bounds=null;state.demo=false;state.maxPrice=null;state.sort='random';
 let savedAreas=structuredClone(state.areas);
 let lastPreferences = '';
 function persistPreferences(){
@@ -72,7 +73,7 @@ function scheduleSearch(force=false){
       if(generation!==searchGeneration)return;
       const result=await findPlaces(regions,state,signal);
       if(generation!==searchGeneration)return;
-      realPlaces=result.places;searchStatus=`${regions.join(' · ')} · 네이버 검색 결과 일부${result.partial?' (일부 검색 실패)':''}`;
+      realPlaces=pickPlaces(result.places,result.places.length);searchStatus=`${regions.join(' · ')} · 네이버 검색 결과 일부${result.partial?' (일부 검색 실패)':''}`;
     }catch(error){if(generation!==searchGeneration||error.name==='AbortError')return;searchError=error.message;searchStatus='검색을 완료하지 못했어요.';}
     render();
   },600);

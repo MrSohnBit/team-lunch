@@ -27,7 +27,7 @@ export function filterPlaces(places, state) {
       && (state.category === '전체' || state.category === place.category)
       && (state.maxPrice === null || (Number.isFinite(place.price) && place.price <= state.maxPrice))
       && (state.areas?.length ? state.areas.some(b => insideBounds(place,b)) : state.bounds ? insideBounds(place, state.bounds) : place.distance <= state.radius))
-    .sort((a,b) => state.sort === 'price' ? (a.price ?? Infinity) - (b.price ?? Infinity) || a.distance - b.distance : a.distance - b.distance);
+    .sort((a,b) => state.sort === 'random' ? 0 : state.sort === 'price' ? (a.price ?? Infinity) - (b.price ?? Infinity) || a.distance - b.distance : a.distance - b.distance);
 }
 export function pickPlaces(places, count = 3, random = Math.random) {
   const copy = [...places];
