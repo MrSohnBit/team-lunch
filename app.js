@@ -1,3 +1,4 @@
+import {readExcluded,writeExcluded,withoutExcluded} from './exclusions.js?v=20261103-exclude1';
 import {findPlaces,regionAt,searchCenters,toPlace} from './search-client.js?v=20261103-detail1';
 import { createAreaController } from './areas.js?v=20261103-area-save1';
 import { readPreferences, writePreferences } from './preferences.js?v=20261103-area-save1';
@@ -24,6 +25,8 @@ icons();
 const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money = n => Number.isFinite(n)?`${n.toLocaleString('ko-KR')}원`:'가격 정보 없음';
 const distance = n => n < 1000 ? `${Math.round(n)}m` : `${(n/1000).toFixed(1)}km`;
+let excludedPlaces=[];
+try{excludedPlaces=readExcluded(localStorage);}catch{}
 let savedPlaces=[];
 try{const data=JSON.parse(localStorage.getItem('team-lunch.saved.real.v1')||'[]');if(Array.isArray(data))savedPlaces=data.map(toPlace).filter(Boolean);}catch{}
 savedPlaces=pickPlaces(savedPlaces,savedPlaces.length);
@@ -54,7 +57,7 @@ $('location-label').textContent = restoredPreferences.center ? '지난번 선택
 const categories = [['전체','✦'],['한식','🍚'],['일식','🍜'],['중식','🥟'],['양식','🍝'],['샐러드','🥗'],['분식','🍙']];
 $('categories').innerHTML = categories.map(([name,emoji]) => `<button type="button" data-category="${name}" class="${name === '전체' ? 'active' : ''}" aria-pressed="${name === '전체'}"><span class="food" aria-hidden="true">${emoji}</span>${name}</button>`).join('');
 function showStatus(message) { $('action-status').textContent=message; $('action-status').hidden=false; }
-function currentPlaces(){return filterPlaces(state.view==='saved'?savedPlaces:realPlaces,{...state,query:'',maxPrice:null});}
+function currentPlaces(){return filterPlaces(withoutExcluded(state.view==='saved'?savedPlaces:realPlaces,excludedPlaces),{...state,query:'',maxPrice:null});}
 function renderCards(places) {
   $('cards').innerHTML=places.map(p=>`<article class="food-card"><button class="card-main" data-detail="${escape(p.id)}" aria-label="${escape(p.name)} 상세 정보"><span class="food-art ${p.tone}" aria-hidden="true">${p.emoji}</span><span class="card-copy"><span class="card-meta">${escape(p.category)}<span class="demo-badge">네이버</span></span><h3>${escape(p.name)}</h3><p class="menu-name">${escape(p.address)}</p><span class="price">가게 정보 보기</span><span class="distance">직선 ${distance(p.distance)}</span></span></button><button class="save-button ${saved.includes(p.id)?'saved':''}" data-save="${escape(p.id)}" aria-label="${escape(p.name)} 저장" aria-pressed="${saved.includes(p.id)}">${icon('heart')}</button></article>`).join('');
   $('result-count').textContent=places.length;$('empty-state').hidden=places.length!==0;$('recommend').disabled=places.length===0;
@@ -80,6 +83,7 @@ function scheduleSearch(force=false){
 }
 function render() {
   scheduleSearch();
+  $('open-excluded').textContent=`제외한 가게 ${excludedPlaces.length}`;
   persistPreferences();
   const places = currentPlaces();
   $('list-title').innerHTML = `${state.view === 'saved' ? '저장한 식당' : '이 근처 점심'} <span id="result-count">${places.length}</span>`;
@@ -108,10 +112,28 @@ function openDetail(id){
   const place=filterPlaces([...realPlaces,...savedPlaces],{...state,radius:Infinity,areas:[],bounds:null,category:'전체',query:'',maxPrice:null}).find(p=>p.id===id);
   if(!place)return;
   const website=place.websiteUrl&&!['map.naver.com','m.place.naver.com','pcmap.place.naver.com'].includes(new URL(place.websiteUrl).hostname)?place.websiteUrl:null;
-  $('detail-content').innerHTML=`<div class="detail-art ${place.tone}" aria-hidden="true">${place.emoji}</div><p class="eyebrow">네이버 지역 검색</p><h2 id="detail-title">${escape(place.name)}</h2><p class="detail-note">${escape(place.fullCategory||place.category)}</p><dl class="place-facts"><dt>주소</dt><dd>${escape(place.address||'제공되지 않음')}</dd>${place.jibunAddress&&place.jibunAddress!==place.address?`<dt>지번 주소</dt><dd>${escape(place.jibunAddress)}</dd>`:''}<dt>거리</dt><dd>검색 기준점에서 직선 ${distance(place.distance)}</dd>${place.description?`<dt>소개</dt><dd>${escape(place.description)}</dd>`:''}</dl><p class="detail-caveat">영업시간·메뉴·가격·전화번호·별점은 검색 API에서 제공하지 않아요. 최신 정보는 네이버에서 확인해 주세요.</p><a class="primary-button full-width detail-link" href="${escape(place.detailUrl)}" target="_blank" rel="noopener noreferrer">네이버에서 보기 ↗</a>${website?`<a class="secondary-button full-width detail-link" href="${escape(website)}" target="_blank" rel="noopener noreferrer">가게 홈페이지 열기 ↗</a>`:''}<button class="secondary-button full-width" id="detail-save">${saved.includes(id)?'저장 해제':'이 기기에 가게 저장'}</button>`;
+  $('detail-content').innerHTML=`<div class="detail-art ${place.tone}" aria-hidden="true">${place.emoji}</div><p class="eyebrow">네이버 지역 검색</p><h2 id="detail-title">${escape(place.name)}</h2><p class="detail-note">${escape(place.fullCategory||place.category)}</p><dl class="place-facts"><dt>주소</dt><dd>${escape(place.address||'제공되지 않음')}</dd>${place.jibunAddress&&place.jibunAddress!==place.address?`<dt>지번 주소</dt><dd>${escape(place.jibunAddress)}</dd>`:''}<dt>거리</dt><dd>검색 기준점에서 직선 ${distance(place.distance)}</dd>${place.description?`<dt>소개</dt><dd>${escape(place.description)}</dd>`:''}</dl><p class="detail-caveat">영업시간·메뉴·가격·전화번호·별점은 검색 API에서 제공하지 않아요. 최신 정보는 네이버에서 확인해 주세요.</p><a class="primary-button full-width detail-link" href="${escape(place.detailUrl)}" target="_blank" rel="noopener noreferrer">네이버에서 보기 ↗</a>${website?`<a class="secondary-button full-width detail-link" href="${escape(website)}" target="_blank" rel="noopener noreferrer">가게 홈페이지 열기 ↗</a>`:''}<button class="secondary-button full-width" id="detail-save">${saved.includes(id)?'저장 해제':'이 기기에 가게 저장'}</button><button class="exclude-button full-width" id="detail-exclude">검색에서 제외</button><p id="exclude-error" class="muted" role="status" hidden></p>`;
   $('detail-save').onclick=()=>{toggleSaved(id);$('detail-save').textContent=saved.includes(id)?'저장 해제':'이 기기에 가게 저장';};
+  $('detail-exclude').onclick=()=>{
+    const next=[...excludedPlaces.filter(p=>p.id!==id),{id:place.id,name:place.name,address:place.address||''}];
+    if(!saveExclusions(next)){ $('exclude-error').hidden=false;$('exclude-error').textContent='저장할 수 없어 제외하지 않았어요. 브라우저 저장 설정을 확인해 주세요.';return; }
+    $('detail-dialog').close();render();
+  };
   $('detail-dialog').showModal();
 }
+function saveExclusions(next){
+  try{if(!writeExcluded(localStorage,next))return false;}catch{return false;}
+  excludedPlaces=next;return true;
+}
+function renderExcluded(){
+  $('excluded-list').innerHTML=excludedPlaces.length?excludedPlaces.map(p=>`<li class="excluded-item"><div><strong>${escape(p.name)}</strong><p>${escape(p.address)}</p></div><button class="small-button" data-restore="${escape(p.id)}" aria-label="${escape(p.name)} 검색에 다시 표시">복원</button></li>`).join(''):'<li class="muted">제외한 가게가 없어요.</li>';
+}
+$('open-excluded').onclick=()=>{renderExcluded();$('excluded-error').hidden=true;$('excluded-dialog').showModal();};
+$('excluded-list').onclick=event=>{
+  const button=event.target.closest('[data-restore]');if(!button)return;
+  if(!saveExclusions(excludedPlaces.filter(p=>p.id!==button.dataset.restore))){$('excluded-error').hidden=false;return;}
+  $('excluded-error').hidden=true;renderExcluded();render();
+};
 function toggleSaved(id){
   if(saved.includes(id))savedPlaces=savedPlaces.filter(p=>p.id!==id);
   else{const p=realPlaces.find(p=>p.id===id);if(p)savedPlaces.push(p);}

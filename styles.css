@@ -24,3 +24,5 @@
 .filter-select,.filter-input{width:100%;box-sizing:border-box;min-height:46px;border:1px solid #dce3d8;border-radius:12px;padding:10px 12px;background:white;color:#263e2f;font:inherit}
 
 .results-actions{display:flex;align-items:center;gap:10px;flex-shrink:0}.results-actions #search-all{color:#758074}.results-heading{gap:8px}@media(max-width:360px){.results-actions{gap:6px}.results-heading h2{font-size:18px}}
+
+.excluded-link{font-size:11px;white-space:nowrap;color:#758074;min-height:44px;padding:4px 2px}.exclude-button{color:#95584a;font-size:13px;min-height:44px;padding:10px}.excluded-item{display:flex;align-items:center;gap:12px;padding:15px 0;border-bottom:1px solid var(--line)}.excluded-item>div{flex:1;min-width:0}.excluded-item strong{font-size:14px}.excluded-item p{font-size:12px;line-height:1.6;color:var(--muted);overflow-wrap:anywhere;margin:5px 0 0}.excluded-item button{flex-shrink:0}#excluded-list{padding:0;list-style:none}
