@@ -35,6 +35,10 @@ test('freehand gestures create, move, cancel, restore and remove areas without m
     controller.add();svg.listeners.pointerdown(event(0,0));svg.listeners.pointermove(event(50,50));svg.listeners.pointermove(event(100,100));svg.listeners.pointerup(event(100,100));
     assert.equal(last.areas.length,1);assert.equal(last.drawing,true);controller.cancel();
     controller.add({south:0,north:20,west:0,east:20});assert.equal(last.areas[1].points.length,4);
-    controller.remove();assert.equal(last.areas.length,1);controller.clear();assert.equal(last.areas.length,0);
+    controller.remove();assert.equal(last.areas.length,1);
+    const saved=structuredClone(last.areas);controller.remove();assert.equal(last.areas.length,0);
+    controller.replace(saved);assert.deepEqual(last.areas,saved);assert.equal(last.drawing,false);
+    controller.add();controller.replace(saved);assert.equal(last.drawing,false);assert.deepEqual(last.areas,saved);
+    controller.clear();assert.equal(last.areas.length,0);
   }finally{globalThis.document=originalDocument;globalThis.ResizeObserver=originalObserver;}
 });

@@ -82,6 +82,12 @@ export function createAreaController(map, n, onChange) {
   }
   function select(index){if(!items[index])return;cancel();active=index;draw();emit();}
   function remove(){cancel();if(active<0)return;items.splice(active,1);active=Math.min(active,items.length-1);draw();emit();}
-  function clear(){cancel();items.length=0;active=-1;draw();emit();}
-  return {add,select,remove,clear,cancel};
+  function replace(areas){
+    if(gesture){map.setOptions('draggable',gesture.draggable);if(svg.hasPointerCapture(gesture.id))svg.releasePointerCapture(gesture.id);}
+    gesture=null;drawing=false;items.length=0;
+    for(const area of areas){const points=area.points??[{lat:area.south,lng:area.west},{lat:area.north,lng:area.west},{lat:area.north,lng:area.east},{lat:area.south,lng:area.east}];items.push(points.map(p=>({...p})));}
+    active=items.length-1;draw();emit();
+  }
+  function clear(){replace([]);}
+  return {add,select,remove,clear,cancel,replace};
 }

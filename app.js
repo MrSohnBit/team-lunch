@@ -1,7 +1,7 @@
-import { createAreaController } from './areas.js?v=20261103-freehand1';
-import { readPreferences, writePreferences } from './preferences.js?v=20261103-freehand1';
+import { createAreaController } from './areas.js?v=20261103-area-save1';
+import { readPreferences, writePreferences } from './preferences.js?v=20261103-area-save1';
 import { config } from './config.js?v=20261103-map1';
-import { demoPlaces, filterPlaces, pickPlaces } from './domain.js?v=20261103-freehand1';
+import { demoPlaces, filterPlaces, pickPlaces } from './domain.js?v=20261103-area-save1';
 const $ = id => document.getElementById(id);
 const paths = {
   user:'M20 21v-2a7 7 0 0 0-14 0v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8',
@@ -29,13 +29,17 @@ const restoredPreferences = readPreferences(document);
 const state = { center: {...config.initialCenter},radius:500,category:'전체',maxPrice:null,query:'',sort:'distance',bounds:null,demo:true,view:'explore', ...restoredPreferences };
 state.areas=restoredPreferences.areas??(restoredPreferences.bounds?[restoredPreferences.bounds]:[]);
 state.bounds=null;
+let savedAreas=structuredClone(state.areas);
 let lastPreferences = '';
 function persistPreferences(){
-  const value=JSON.stringify(state);
-  if(value===lastPreferences)return;
+  const preferences={...state,areas:savedAreas};
+  const value=JSON.stringify(preferences);
+  if(value===lastPreferences)return true;
   lastPreferences=value;
-  const ok=writePreferences(state,document,window.location);
+  const ok=writePreferences(preferences,document,window.location);
+  if(!ok)lastPreferences='';
   $('guest-storage-status').textContent=ok?'게스트 설정은 이 브라우저의 쿠키에 30일간 저장돼요. 선택 지역도 함께 기억해요.':'쿠키 저장이 제한되어 설정을 이번 방문에만 기억해요.';
+  return ok;
 }
 $('query').value=state.query;
 $('sort').value=state.sort;
@@ -119,15 +123,19 @@ function setView(view){state.view=view;for(const key of ['explore','saved']){con
 $('nav-explore').onclick=()=>setView('explore');$('nav-saved').onclick=()=>setView('saved');
 $('recommend').onclick=()=>{const chosen=pickPlaces(currentPlaces());if(!chosen.length)return;renderCards(chosen);$('list-title').innerHTML=`오늘의 추천 <span id="result-count">${chosen.length}</span>`;$('active-filters').textContent+=' · 조건 안에서 무작위 추천';renderMap(chosen);$('results').scrollIntoView({behavior:'smooth',block:'start'});toast(`${chosen.length}개의 예시 메뉴를 골랐어요. 필터를 바꾸면 전체 목록으로 돌아가요.`);};
 function showAreaControls(active=-1,drawing=false){
-  const enabled=state.areas.length>0||drawing;
+  const dirty=JSON.stringify(state.areas)!==JSON.stringify(savedAreas);
+  const enabled=state.areas.length>0||drawing||dirty;
+  $('save-areas').disabled=!dirty||drawing;
+  $('cancel-areas').hidden=!dirty&&!drawing;
+  $('area-save-status').textContent=drawing?'경계를 그리는 중':dirty?'저장하지 않은 변경사항':'저장된 영역';
   $('radius-mode').classList.toggle('active',!enabled);$('radius-mode').setAttribute('aria-pressed',!enabled);
   $('area-mode').classList.toggle('active',enabled);$('area-mode').setAttribute('aria-pressed',enabled);
-  $('area-help').hidden=!enabled;$('area-help').textContent=drawing?'지도 위에서 손가락이나 마우스로 경계를 그린 뒤 놓으세요. 작은 영역은 다시 그릴 수 있어요.':'영역 안쪽을 끌면 도형만 이동해요. 영역 추가로 다른 경계를 그릴 수 있어요.';$('area-tools').hidden=!enabled;$('radius-presets').hidden=enabled;
+  $('area-help').hidden=!enabled;$('area-help').textContent=drawing?'지도 위에서 손가락이나 마우스로 경계를 그린 뒤 놓으세요. 작은 영역은 다시 그릴 수 있어요.':'영역 안쪽을 끌어 위치를 조정한 뒤 저장하기를 눌러 주세요.';$('area-tools').hidden=!enabled;$('radius-presets').hidden=enabled;
   $('area-list').innerHTML=state.areas.map((_,i)=>`<button class="small-button ${i===active?'active':''}" data-area-index="${i}" aria-pressed="${i===active}">영역 ${i+1}</button>`).join('');
   $('add-area').disabled=state.areas.length>=5;
   $('remove-area').disabled=active<0;
 }
-function clearArea(){if(areaController)areaController.clear();else{state.areas=[];showAreaControls();}}
+function clearArea(){savedAreas=[];if(areaController)areaController.clear();else{state.areas=[];showAreaControls();}}
 $('radius-mode').onclick=()=>{clearArea();render();};
 function addArea(){
   if(!map||mapFailed||!areaController){toast('지도 연결 후 영역을 선택할 수 있어요.');return;}
@@ -137,6 +145,13 @@ function addArea(){
 $('area-mode').onclick=()=>{if(!state.areas.length)addArea();};
 $('add-area').onclick=addArea;
 $('remove-area').onclick=()=>areaController?.remove();
+$('save-areas').onclick=()=>{
+  const previous=savedAreas;savedAreas=structuredClone(state.areas);lastPreferences='';
+  if(!persistPreferences()){savedAreas=previous;toast('쿠키 저장이 제한되어 저장하지 못했어요. 브라우저 설정을 확인해 주세요.');return;}
+  areaController?.select(Math.max(0,state.areas.length-1));
+  showAreaControls(state.areas.length-1);render();toast('선택 영역을 저장했어요. 다음 방문에도 복원돼요.');
+};
+$('cancel-areas').onclick=()=>{areaController?.replace(savedAreas);toast('변경을 취소하고 마지막 저장 상태로 돌아왔어요.');};
 $('area-list').onclick=event=>{const button=event.target.closest('[data-area-index]');if(button)areaController?.select(Number(button.dataset.areaIndex));};
 $('search-here').onclick=()=>{if(!map||mapFailed)return;locationGeneration++;clearArea();const c=map.getCenter();state.center={lat:c.lat(),lng:c.lng()};$('location-label').textContent='지도에서 선택한 위치';render();toast('이 위치를 기준으로 메뉴를 찾았어요.');};
 $('location').onclick=()=>{locationGeneration++;clearArea();state.center={...config.initialCenter};$('location-label').textContent=config.initialLocationLabel;if(map&&!mapFailed){map.setCenter(new naver.maps.LatLng(state.center.lat,state.center.lng));map.setZoom(15);}render();toast('기본 위치인 서울시청으로 돌아왔어요.');};
@@ -166,7 +181,8 @@ function initializeNaverMap(){
     new ResizeObserver(()=>{const el=$('map');map.setSize(new n.Size(el.clientWidth,el.clientHeight));}).observe($('map'));
     const restoredAreas=state.areas.map(b=>({...b}));
     areaController=createAreaController(map,n,(areas,active,drawing)=>{state.areas=areas;showAreaControls(active,drawing);render();});
-    if(restoredAreas.length)restoredAreas.forEach(b=>areaController.add(b));else{showAreaControls();render();}
+    areaController.replace(restoredAreas);
+    savedAreas=structuredClone(state.areas);showAreaControls(state.areas.length-1);render();
   }catch(error){console.error('Naver map initialization failed', error);mapError('지도를 불러오지 못했어요','잠시 후 다시 시도해 주세요. 메뉴 미리보기는 계속 이용할 수 있어요.');}
 };
 function loadMap(){
