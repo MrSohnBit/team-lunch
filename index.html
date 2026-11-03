@@ -5,8 +5,8 @@
 <meta name="theme-color" content="#f7f8f2"><meta name="description" content="가까운 곳에서, 원하는 메뉴로. 함께 고르는 우리 점심.">
 <title>우리 점심 · 가까운 오늘의 한 끼</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='20' fill='%232c513e'/%3E%3Ctext x='32' y='44' text-anchor='middle' font-size='40'%3E🍚%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="styles.css?v=20261103-layout1">
-<script type="module" src="app.js?v=20261103-layout1"></script>
+<link rel="stylesheet" href="styles.css?v=20261103-region1">
+<script type="module" src="app.js?v=20261103-region1"></script>
 </head>
 <body>
 <a class="skip" href="#results">메뉴 목록 바로가기</a>
@@ -20,13 +20,13 @@
 <div class="category-list" id="categories" aria-label="음식 종류"></div>
 <div class="workspace">
 <section class="map-section" aria-label="검색 지역 지도">
-<div class="map-toolbar"><div class="segmented"><button class="active" id="radius-mode" aria-pressed="true">반경 검색</button><button id="area-mode" aria-pressed="false">자유형 선택</button></div><span class="map-caption" id="scope-label">반경 500m</span></div>
+<div class="map-toolbar"><div class="segmented"><button class="active" id="radius-mode" aria-pressed="true">반경 검색</button><button id="area-mode" aria-pressed="false">자유형 선택</button></div><button id="toggle-region" class="region-toggle" type="button" aria-label="검색 지역 입력 열기" aria-expanded="false" aria-controls="region-panel"><span data-icon="search"></span></button><span class="map-caption" id="scope-label">반경 500m</span></div>
 <div class="map-wrap"><div id="map" aria-label="네이버 지도"></div><div class="map-placeholder" id="map-placeholder" role="status"><span class="map-symbol" data-icon="map"></span><strong id="map-status-title">지도를 준비하고 있어요</strong><p id="map-status-copy">잠시만 기다려 주세요.</p><button id="retry-map" class="small-button" hidden>다시 연결</button></div><div class="map-search-controls" id="map-controls" hidden><button id="search-here" class="floating-button"><span data-icon="search"></span>이 위치에서 찾기</button></div><button id="map-my-location" class="map-location-button" type="button" aria-label="현재 위치로 이동하고 검색 기준 설정" title="현재 위치로 이동" hidden><span data-icon="locate"></span></button></div>
 <div class="scope-controls"><div class="radius-presets" id="radius-presets"><button data-radius="300">300m</button><button data-radius="500" class="active">500m</button><button data-radius="1000">1km</button><button id="fine-radius">직접 설정 <span data-icon="chevron"></span></button></div><div id="area-tools" hidden><div id="area-list" class="area-list" aria-label="선택한 영역"></div><div class="area-actions"><button id="add-area" class="small-button">＋ 영역 추가</button><button id="remove-area" class="small-button">선택 영역 삭제</button><span>최대 5개</span></div><div class="area-save-actions"><span id="area-save-status" role="status">저장된 영역</span><button id="cancel-areas" class="small-button" hidden>변경 취소</button><button id="save-areas" class="primary-button" disabled>저장하기</button></div></div><p id="area-help" hidden>지도 위에 경계를 그려 자유형 영역을 선택하세요. 선택한 영역 안쪽을 끌면 도형만 이동해요.</p></div>
 <p class="map-footnote" id="map-footnote">거리 기준은 직선거리예요. 지도를 움직여 기준 위치를 바꿀 수 있어요.</p>
 </section>
 <section class="results-section" id="results" tabindex="-1">
-<div class="search-feedback"><label for="search-region">검색 지역 <span>(비우면 지도 위치 사용)</span></label><input id="search-region" maxlength="60" placeholder="예: 서울 중구 태평로1가"><p id="search-status" role="status"></p><button id="retry-search" class="small-button" hidden>다시 검색</button></div><div class="demo-notice"><div><strong>네이버 실제 식당 검색</strong><p>검색 결과 일부를 보여드려요. 가격·별점·메뉴는 네이버에서 확인하세요.</p></div></div>
+<div class="search-feedback" id="region-panel"><label for="search-region">검색 지역 <span>(비우면 지도 위치 사용)</span></label><input id="search-region" maxlength="60" placeholder="예: 서울 중구 태평로1가"></div><div class="search-progress"><p id="search-status" role="status"></p><button id="retry-search" class="small-button" hidden>다시 검색</button></div>
 <div class="results-heading"><div><p class="eyebrow" id="list-eyebrow">LUNCH PICKS</p><h2 id="list-title">이 근처 점심 <span id="result-count">0</span></h2></div><div class="results-actions"><button class="recommend-button" id="recommend" title="현재 검색 조건에 맞는 식당에서 무작위로 골라요"><span data-icon="shuffle"></span><span>3개 골라줘</span></button><button class="recommend-button" id="search-all" type="button">전체 검색</button></div></div>
 <div class="results-meta"><p id="active-filters" class="filter-summary" aria-live="polite"></p><button id="open-excluded" class="excluded-link" type="button">제외한 가게 0</button></div>
 <p id="action-status" class="filter-summary" role="status" hidden></p><div id="cards" class="cards"></div>

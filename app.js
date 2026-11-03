@@ -48,6 +48,20 @@ function persistPreferences(){
   return ok;
 }
 $('query').value=state.query;
+const mobileRegion=window.matchMedia('(max-width:799px)');
+let regionExpanded=false;
+function renderRegionPanel(){
+  const panel=$('region-panel'),button=$('toggle-region');
+  if(mobileRegion.matches)document.querySelector('.map-wrap').before(panel);
+  else $('results').prepend(panel);
+  panel.hidden=mobileRegion.matches&&!regionExpanded;
+  button.setAttribute('aria-expanded',String(regionExpanded));
+  button.setAttribute('aria-label',regionExpanded?'검색 지역 입력 닫기':'검색 지역 입력 열기');
+}
+$('toggle-region').onclick=()=>{regionExpanded=!regionExpanded;renderRegionPanel();if(regionExpanded)$('search-region').focus({preventScroll:true});};
+mobileRegion.addEventListener('change',renderRegionPanel);
+renderRegionPanel();
+
 
 
 let map, circle, centerMarker, markers = [], mapFailed = false, mapTimer;
@@ -160,6 +174,20 @@ $('radius-slider').oninput=event=>$('radius-output').textContent=distance(Number
 $('clear-draft').onclick=()=>{$('filter-category').value='전체';$('filter-query').value='';$('radius-slider').value=500;$('radius-output').textContent='500m';};
 $('filter-form').onsubmit=()=>{
   state.category=$('filter-category').value;state.query=$('filter-query').value.trim();$('query').value=state.query;
+const mobileRegion=window.matchMedia('(max-width:799px)');
+let regionExpanded=false;
+function renderRegionPanel(){
+  const panel=$('region-panel'),button=$('toggle-region');
+  if(mobileRegion.matches)document.querySelector('.map-wrap').before(panel);
+  else $('results').prepend(panel);
+  panel.hidden=mobileRegion.matches&&!regionExpanded;
+  button.setAttribute('aria-expanded',String(regionExpanded));
+  button.setAttribute('aria-label',regionExpanded?'검색 지역 입력 닫기':'검색 지역 입력 열기');
+}
+$('toggle-region').onclick=()=>{regionExpanded=!regionExpanded;renderRegionPanel();if(regionExpanded)$('search-region').focus({preventScroll:true});};
+mobileRegion.addEventListener('change',renderRegionPanel);
+renderRegionPanel();
+
   if(!state.areas.length)state.radius=Number($('radius-slider').value);
   render();
 };
