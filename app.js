@@ -54,7 +54,7 @@ function renderRegionPanel(){
   const panel=$('region-panel'),button=$('toggle-region');
   if(mobileRegion.matches)document.querySelector('.map-wrap').before(panel);
   else $('results').prepend(panel);
-  panel.hidden=mobileRegion.matches&&!regionExpanded;
+  panel.hidden=!regionExpanded;
   button.setAttribute('aria-expanded',String(regionExpanded));
   button.setAttribute('aria-label',regionExpanded?'검색 지역 입력 닫기':'검색 지역 입력 열기');
 }
@@ -180,7 +180,7 @@ function renderRegionPanel(){
   const panel=$('region-panel'),button=$('toggle-region');
   if(mobileRegion.matches)document.querySelector('.map-wrap').before(panel);
   else $('results').prepend(panel);
-  panel.hidden=mobileRegion.matches&&!regionExpanded;
+  panel.hidden=!regionExpanded;
   button.setAttribute('aria-expanded',String(regionExpanded));
   button.setAttribute('aria-label',regionExpanded?'검색 지역 입력 닫기':'검색 지역 입력 열기');
 }
