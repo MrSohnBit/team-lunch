@@ -4,3 +4,5 @@
 @media(max-width:360px){.app-shell{padding-left:16px;padding-right:16px}h1{font-size:27px}.card-main{gap:10px}.food-art{width:61px;height:73px;font-size:32px}.distance{display:block;margin:5px 0 0}.bottom-nav{margin:0 -16px}.map-caption{font-size:11px}.segmented button{padding:7px 10px}.radius-presets{gap:5px}.radius-presets button{padding:8px 11px}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 @media(max-width:360px){.category-list{margin-right:-16px;padding-right:16px}}
+
+.guest-storage{margin:24px 0;padding:16px;border-top:1px solid #dce3d8;color:#647064;font-size:12px;line-height:1.7}.guest-storage p{margin:0 0 8px}.guest-storage button{font-size:12px}

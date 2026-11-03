@@ -1,3 +1,4 @@
+import { readPreferences, writePreferences } from './preferences.js?v=20261103-cookie1';
 import { config } from './config.js?v=20261103-map1';
 import { demoPlaces, filterPlaces, pickPlaces, normalizedBounds } from './domain.js';
 const $ = id => document.getElementById(id);
@@ -23,11 +24,23 @@ const money = n => `${n.toLocaleString('ko-KR')}원`;
 const distance = n => n < 1000 ? `${Math.round(n)}m` : `${(n/1000).toFixed(1)}km`;
 let saved = [];
 try { const data = JSON.parse(localStorage.getItem('team-lunch.saved.v1') || '[]'); if (Array.isArray(data)) saved = data.filter(id => demoPlaces.some(p => p.id === id)); } catch { /* Storage may be disabled. */ }
-const state = { center: {...config.initialCenter},radius:500,category:'전체',maxPrice:null,query:'',sort:'distance',bounds:null,demo:true,view:'explore' };
+const restoredPreferences = readPreferences(document);
+const state = { center: {...config.initialCenter},radius:500,category:'전체',maxPrice:null,query:'',sort:'distance',bounds:null,demo:true,view:'explore', ...restoredPreferences };
+let lastPreferences = '';
+function persistPreferences(){
+  const value=JSON.stringify(state);
+  if(value===lastPreferences)return;
+  lastPreferences=value;
+  const ok=writePreferences(state,document,window.location);
+  $('guest-storage-status').textContent=ok?'게스트 설정은 이 브라우저의 쿠키에 30일간 저장돼요. 선택 지역도 함께 기억해요.':'쿠키 저장이 제한되어 설정을 이번 방문에만 기억해요.';
+}
+$('query').value=state.query;
+$('sort').value=state.sort;
+$('demo-toggle').checked=state.demo;
 let map, circle, centerMarker, rectangle, handles = [], markers = [], mapFailed = false, mapTimer, toastTimer;
 let areaMode = false;
 let locationGeneration = 0;
-$('location-label').textContent = config.initialLocationLabel;
+$('location-label').textContent = restoredPreferences.center ? '지난번 선택한 위치' : config.initialLocationLabel;
 const categories = [['전체','✦'],['한식','🍚'],['일식','🍜'],['중식','🥟'],['양식','🍝'],['샐러드','🥗'],['분식','🍙']];
 $('categories').innerHTML = categories.map(([name,emoji]) => `<button type="button" data-category="${name}" class="${name === '전체' ? 'active' : ''}" aria-pressed="${name === '전체'}"><span class="food" aria-hidden="true">${emoji}</span>${name}</button>`).join('');
 function toast(message) { clearTimeout(toastTimer); $('toast').textContent=message; $('toast').hidden=false; toastTimer=setTimeout(() => $('toast').hidden=true,4500); }
@@ -39,6 +52,7 @@ function renderCards(places) {
   $('recommend').disabled = places.length === 0;
 }
 function render() {
+  persistPreferences();
   const places = currentPlaces();
   $('list-title').innerHTML = `${state.view === 'saved' ? '저장한 메뉴' : '이 근처 점심'} <span id="result-count">${places.length}</span>`;
   $('list-eyebrow').textContent=state.view==='saved'?'SAVED ON THIS DEVICE':'LUNCH PICKS';
@@ -87,6 +101,14 @@ $('filter-form').onsubmit=()=>{const value=new FormData($('filter-form')).get('b
 $('radius-presets').onclick=event=>{const btn=event.target.closest('[data-radius]');if(btn){state.radius=Number(btn.dataset.radius);render();}};
 function resetFilters(){state.radius=500;state.category='전체';state.maxPrice=null;state.query='';$('query').value='';clearArea();render();}
 $('reset-filters').onclick=resetFilters;
+$('reset-guest-settings').onclick=()=>{
+  locationGeneration++;clearArea();
+  Object.assign(state,{center:{...config.initialCenter},radius:500,category:'전체',maxPrice:null,query:'',sort:'distance',demo:true});
+  $('query').value='';$('sort').value='distance';$('demo-toggle').checked=true;
+  $('location-label').textContent=config.initialLocationLabel;
+  if(map&&!mapFailed){map.setCenter(new naver.maps.LatLng(state.center.lat,state.center.lng));map.setZoom(15);}
+  render();toast('저장된 게스트 설정을 기본값으로 초기화했어요.');
+};
 for(const id of ['login','review-info','nav-reviews'])$(id).onclick=()=>$('info-dialog').showModal();
 for(const btn of document.querySelectorAll('[data-close]'))btn.onclick=()=>btn.closest('dialog').close();
 for(const dialog of document.querySelectorAll('dialog'))dialog.addEventListener('click',event=>{if(event.target===dialog){const r=dialog.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)dialog.close();}});
@@ -95,13 +117,14 @@ $('nav-explore').onclick=()=>setView('explore');$('nav-saved').onclick=()=>setVi
 $('recommend').onclick=()=>{const chosen=pickPlaces(currentPlaces());if(!chosen.length)return;renderCards(chosen);$('list-title').innerHTML=`오늘의 추천 <span id="result-count">${chosen.length}</span>`;$('active-filters').textContent+=' · 조건 안에서 무작위 추천';renderMap(chosen);$('results').scrollIntoView({behavior:'smooth',block:'start'});toast(`${chosen.length}개의 예시 메뉴를 골랐어요. 필터를 바꾸면 전체 목록으로 돌아가요.`);};
 function clearArea(){areaMode=false;state.bounds=null;if(rectangle){rectangle.setMap(null);rectangle=null;}handles.forEach(h=>{naver.maps.Event.clearInstanceListeners(h);h.setMap(null);});handles=[];$('radius-mode').classList.add('active');$('radius-mode').setAttribute('aria-pressed','true');$('area-mode').classList.remove('active');$('area-mode').setAttribute('aria-pressed','false');$('area-help').hidden=true;$('radius-presets').hidden=false;}
 $('radius-mode').onclick=()=>{clearArea();render();};
-$('area-mode').onclick=()=>{
+$('area-mode').onclick=()=>selectArea();
+function selectArea(restoredBounds=null){
   if(!map||mapFailed){toast('지도 연결 후 영역을 선택할 수 있어요.');return;}
   if(areaMode)return;
   clearArea();areaMode=true;
   const c=map.getCenter(),lat=c.lat(),lng=c.lng();state.center={lat,lng};locationGeneration++;$('location-label').textContent='지도에서 선택한 위치';
-  const n=naver.maps;rectangle=new n.Rectangle({map,bounds:new n.LatLngBounds(new n.LatLng(lat-.0015,lng-.002),new n.LatLng(lat+.0015,lng+.002)),strokeColor:'#315940',strokeWeight:2,fillColor:'#9cbb71',fillOpacity:.18});
-  const positions=[new n.LatLng(lat-.0015,lng-.002),new n.LatLng(lat+.0015,lng+.002)];
+  const n=naver.maps;rectangle=new n.Rectangle({map,bounds:new n.LatLngBounds(new n.LatLng(restoredBounds?.south??lat-.0015,restoredBounds?.west??lng-.002),new n.LatLng(restoredBounds?.north??lat+.0015,restoredBounds?.east??lng+.002)),strokeColor:'#315940',strokeWeight:2,fillColor:'#9cbb71',fillOpacity:.18});
+  const positions=[new n.LatLng(restoredBounds?.south??lat-.0015,restoredBounds?.west??lng-.002),new n.LatLng(restoredBounds?.north??lat+.0015,restoredBounds?.east??lng+.002)];
   handles=positions.map((position,index)=>{const handle=new n.Marker({map,position,draggable:true,title:index?'북동쪽 꼭짓점':'남서쪽 꼭짓점',icon:{content:'<span class="area-handle"></span>',anchor:new n.Point(12,12)}});n.Event.addListener(handle,'dragend',updateArea);return handle;});
   $('radius-mode').classList.remove('active');$('radius-mode').setAttribute('aria-pressed','false');$('area-mode').classList.add('active');$('area-mode').setAttribute('aria-pressed','true');$('area-help').hidden=false;$('radius-presets').hidden=true;updateArea();
 };
@@ -128,7 +151,7 @@ function initializeNaverMap(){
     centerMarker=new n.Marker({map,position:new n.LatLng(state.center.lat,state.center.lng),title:'검색 기준점',icon:{content:'<span class="center-pin"></span>',anchor:new n.Point(9,9)}});
     clearTimeout(mapTimer);$('map-placeholder').hidden=true;$('map-controls').hidden=false;
     new ResizeObserver(()=>{const el=$('map');map.setSize(new n.Size(el.clientWidth,el.clientHeight));}).observe($('map'));
-    render();
+    if(state.bounds)selectArea({...state.bounds});else render();
   }catch(error){console.error('Naver map initialization failed', error);mapError('지도를 불러오지 못했어요','잠시 후 다시 시도해 주세요. 메뉴 미리보기는 계속 이용할 수 있어요.');}
 };
 function loadMap(){
