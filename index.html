@@ -5,8 +5,8 @@
 <meta name="theme-color" content="#f7f8f2"><meta name="description" content="가까운 곳에서, 원하는 메뉴로. 함께 고르는 우리 점심.">
 <title>우리 점심 · 가까운 오늘의 한 끼</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='20' fill='%232c513e'/%3E%3Ctext x='32' y='44' text-anchor='middle' font-size='40'%3E🍚%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="styles.css?v=20261103-random1">
-<script type="module" src="app.js?v=20261103-random1"></script>
+<link rel="stylesheet" href="styles.css?v=20261103-all1">
+<script type="module" src="app.js?v=20261103-all1"></script>
 </head>
 <body>
 <a class="skip" href="#results">메뉴 목록 바로가기</a>
@@ -27,9 +27,9 @@
 </section>
 <section class="results-section" id="results" tabindex="-1">
 <div class="search-feedback"><label for="search-region">검색 지역 <span>(비우면 지도 위치 사용)</span></label><input id="search-region" maxlength="60" placeholder="예: 서울 중구 태평로1가"><p id="search-status" role="status"></p><button id="retry-search" class="small-button" hidden>다시 검색</button></div><div class="demo-notice"><div><strong>네이버 실제 식당 검색</strong><p>검색 결과 일부를 보여드려요. 가격·별점·메뉴는 네이버에서 확인하세요.</p></div></div>
-<div class="results-heading"><div><p class="eyebrow" id="list-eyebrow">LUNCH PICKS</p><h2 id="list-title">이 근처 점심 <span id="result-count">0</span></h2></div><button class="recommend-button" id="recommend" title="현재 검색 조건에 맞는 식당에서 무작위로 골라요"><span data-icon="shuffle"></span><span>3개 골라줘</span></button></div>
+<div class="results-heading"><div><p class="eyebrow" id="list-eyebrow">LUNCH PICKS</p><h2 id="list-title">이 근처 점심 <span id="result-count">0</span></h2></div><div class="results-actions"><button class="recommend-button" id="recommend" title="현재 검색 조건에 맞는 식당에서 무작위로 골라요"><span data-icon="shuffle"></span><span>3개 골라줘</span></button><button class="recommend-button" id="search-all" type="button">전체 검색</button></div></div>
 <div class="results-meta"><p id="active-filters" class="filter-summary" aria-live="polite"></p></div>
-<div id="cards" class="cards"></div>
+<p id="action-status" class="filter-summary" role="status" hidden></p><div id="cards" class="cards"></div>
 <div class="empty-state" id="empty-state" hidden><span data-icon="bowl"></span><h3 id="empty-title">조건에 맞는 메뉴가 없어요</h3><p id="empty-copy">반경을 넓히거나 다른 음식 종류를 골라보세요.</p><button id="reset-filters" class="small-button">필터 초기화</button></div>
 
 <div class="review-banner"><span class="review-icon" data-icon="users"></span><div><strong>우리끼리 나누는 진짜 후기</strong><p>부서 리뷰와 Google 로그인은 준비 중이에요.</p></div><button id="review-info" aria-label="부서 리뷰 안내"><span data-icon="chevron"></span></button></div>
@@ -44,6 +44,6 @@
 <dialog id="filter-dialog" class="sheet" aria-labelledby="filter-title"><form method="dialog" id="filter-form"><div class="sheet-handle"></div><div class="dialog-heading"><h2 id="filter-title">오늘 점심 조건</h2><button type="button" class="icon-button" data-close aria-label="필터 닫기"><span data-icon="close"></span></button></div><fieldset><legend>음식 종류</legend><select id="filter-category" class="filter-select" aria-label="필터 음식 종류"><option>전체</option><option>한식</option><option>일식</option><option>중식</option><option>양식</option><option>샐러드</option><option>분식</option></select></fieldset><fieldset><legend>검색어</legend><input id="filter-query" class="filter-input" type="search" maxlength="100" placeholder="식당명 또는 음식 종류" aria-label="필터 검색어"></fieldset><p id="filter-area-note" class="muted" hidden></p><fieldset id="radius-field"><legend>검색 반경 <output id="radius-output">500m</output></legend><input id="radius-slider" type="range" min="10" max="2000" step="10" value="500" aria-label="검색 반경 10미터 단위"><div class="range-labels"><span>10m</span><span>2km</span></div><p class="muted">10m 단위로 조절해요. 위치 정확도는 기기 환경에 따라 달라요.</p></fieldset><div class="sheet-actions"><button type="button" id="clear-draft" class="secondary-button">초기화</button><button type="submit" class="primary-button">조건 적용하기</button></div></form></dialog>
 <dialog id="detail-dialog" class="sheet" aria-labelledby="detail-title"><div class="sheet-handle"></div><div class="dialog-heading"><p class="eyebrow">가게 정보</p><button class="icon-button" data-close aria-label="가게 상세 닫기"><span data-icon="close"></span></button></div><div id="detail-content"></div></dialog>
 <dialog id="info-dialog" class="sheet" aria-labelledby="info-title"><div class="sheet-handle"></div><div class="dialog-heading"><h2 id="info-title">함께 쓰는 우리 점심</h2><button class="icon-button" data-close aria-label="안내 닫기"><span data-icon="close"></span></button></div><div class="info-illustration">🍚 🥢</div><p class="info-lead">둘러보기는 누구나,<br>리뷰는 우리끼리.</p><p class="muted">지금은 게스트로 실제 식당을 검색하고 네이버에서 상세 정보를 볼 수 있어요. Google 로그인과 부서원 전용 리뷰는 준비 중입니다.</p><button class="primary-button full-width" data-close>게스트로 계속 둘러보기</button></dialog>
-<div class="toast" id="toast" role="status" hidden></div>
+
 <noscript><p class="noscript">지도와 메뉴 검색을 이용하려면 JavaScript를 활성화해 주세요.</p></noscript>
 </body></html>
