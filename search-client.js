@@ -6,8 +6,10 @@ export function toPlace(p){
   let url;try{url=new URL(p.detailUrl);}catch{return null;}
   if(url.protocol!=='https:'||!['map.naver.com','m.place.naver.com','pcmap.place.naver.com'].includes(url.hostname))return null;
   if(!p.directDetail)url=new URL('https://map.naver.com/p/search/'+encodeURIComponent(`${(p.address||'').split(/\s+/).slice(0,2).join(' ')} ${p.name}`.trim()));
-  const category=categoryFor(p.category);
-  return {...p,detailUrl:url.href,category,menu:p.address||'',price:null,emoji:({한식:'🍚',일식:'🍜',중식:'🥟',양식:'🍝',샐러드:'🥗',분식:'🍙'})[category]||'🍽️',tone:'sage'};
+  const fullCategory=p.fullCategory||p.category;
+  const category=categoryFor(fullCategory);
+  let websiteUrl=null;try{const site=new URL(p.websiteUrl);if(['http:','https:'].includes(site.protocol)&&!site.username&&!site.password)websiteUrl=site.href;}catch{}
+  return {...p,websiteUrl,fullCategory,detailUrl:url.href,category,menu:p.address||'',price:null,emoji:({한식:'🍚',일식:'🍜',중식:'🥟',양식:'🍝',샐러드:'🥗',분식:'🍙'})[category]||'🍽️',tone:'sage'};
 }
 export function searchCenters(state){
   if(!state.areas.length)return [state.center];

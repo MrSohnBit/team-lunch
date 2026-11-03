@@ -1,4 +1,4 @@
-import {findPlaces,regionAt,searchCenters,toPlace} from './search-client.js?v=20261103-real1';
+import {findPlaces,regionAt,searchCenters,toPlace} from './search-client.js?v=20261103-detail1';
 import { createAreaController } from './areas.js?v=20261103-area-save1';
 import { readPreferences, writePreferences } from './preferences.js?v=20261103-area-save1';
 import { config } from './config.js?v=20261103-map1';
@@ -55,7 +55,7 @@ $('categories').innerHTML = categories.map(([name,emoji]) => `<button type="butt
 function toast(message) { clearTimeout(toastTimer); $('toast').textContent=message; $('toast').hidden=false; toastTimer=setTimeout(() => $('toast').hidden=true,4500); }
 function currentPlaces(){return filterPlaces(state.view==='saved'?savedPlaces:realPlaces,{...state,query:'',maxPrice:null});}
 function renderCards(places) {
-  $('cards').innerHTML=places.map(p=>`<article class="food-card"><a class="card-main" href="${escape(p.detailUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escape(p.name)} 네이버에서 보기, 새 창"><span class="food-art ${p.tone}" aria-hidden="true">${p.emoji}</span><span class="card-copy"><span class="card-meta">${escape(p.category)}<span class="demo-badge">네이버</span></span><h3>${escape(p.name)}</h3><p class="menu-name">${escape(p.address)}</p><span class="price">네이버에서 보기 ↗</span><span class="distance">직선 ${distance(p.distance)}</span></span></a><button class="save-button ${saved.includes(p.id)?'saved':''}" data-save="${escape(p.id)}" aria-label="${escape(p.name)} 저장" aria-pressed="${saved.includes(p.id)}">${icon('heart')}</button></article>`).join('');
+  $('cards').innerHTML=places.map(p=>`<article class="food-card"><button class="card-main" data-detail="${escape(p.id)}" aria-label="${escape(p.name)} 상세 정보"><span class="food-art ${p.tone}" aria-hidden="true">${p.emoji}</span><span class="card-copy"><span class="card-meta">${escape(p.category)}<span class="demo-badge">네이버</span></span><h3>${escape(p.name)}</h3><p class="menu-name">${escape(p.address)}</p><span class="price">가게 정보 보기</span><span class="distance">직선 ${distance(p.distance)}</span></span></button><a class="card-naver-link" href="${escape(p.detailUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escape(p.name)} 네이버에서 보기, 새 창">네이버에서 보기 ↗</a><button class="save-button ${saved.includes(p.id)?'saved':''}" data-save="${escape(p.id)}" aria-label="${escape(p.name)} 저장" aria-pressed="${saved.includes(p.id)}">${icon('heart')}</button></article>`).join('');
   $('result-count').textContent=places.length;$('empty-state').hidden=places.length!==0;$('recommend').disabled=places.length===0;
 }
 function scheduleSearch(force=false){
@@ -103,7 +103,14 @@ function renderMap(places) {
   circle.setMap(state.areas.length ? null : map); circle.setCenter(new naver.maps.LatLng(state.center.lat,state.center.lng)); circle.setRadius(state.radius);
   centerMarker.setPosition(new naver.maps.LatLng(state.center.lat,state.center.lng));centerMarker.setMap(state.areas.length?null:map);
 }
-function openDetail(id){const p=[...realPlaces,...savedPlaces].find(p=>p.id===id);if(p)window.open(p.detailUrl,'_blank','noopener,noreferrer');}
+function openDetail(id){
+  const place=filterPlaces([...realPlaces,...savedPlaces],{...state,radius:Infinity,areas:[],bounds:null,category:'전체',query:'',maxPrice:null}).find(p=>p.id===id);
+  if(!place)return;
+  const website=place.websiteUrl&&!['map.naver.com','m.place.naver.com','pcmap.place.naver.com'].includes(new URL(place.websiteUrl).hostname)?place.websiteUrl:null;
+  $('detail-content').innerHTML=`<div class="detail-art ${place.tone}" aria-hidden="true">${place.emoji}</div><p class="eyebrow">네이버 지역 검색</p><h2 id="detail-title">${escape(place.name)}</h2><p class="detail-note">${escape(place.fullCategory||place.category)}</p><dl class="place-facts"><dt>주소</dt><dd>${escape(place.address||'제공되지 않음')}</dd>${place.jibunAddress&&place.jibunAddress!==place.address?`<dt>지번 주소</dt><dd>${escape(place.jibunAddress)}</dd>`:''}<dt>거리</dt><dd>검색 기준점에서 직선 ${distance(place.distance)}</dd>${place.description?`<dt>소개</dt><dd>${escape(place.description)}</dd>`:''}</dl><p class="detail-caveat">영업시간·메뉴·가격·전화번호·별점은 검색 API에서 제공하지 않아요. 최신 정보는 네이버에서 확인해 주세요.</p><a class="primary-button full-width detail-link" href="${escape(place.detailUrl)}" target="_blank" rel="noopener noreferrer">네이버에서 보기 ↗</a>${website?`<a class="secondary-button full-width detail-link" href="${escape(website)}" target="_blank" rel="noopener noreferrer">가게 홈페이지 열기 ↗</a>`:''}<button class="secondary-button full-width" id="detail-save">${saved.includes(id)?'저장 해제':'이 기기에 가게 저장'}</button>`;
+  $('detail-save').onclick=()=>{toggleSaved(id);$('detail-save').textContent=saved.includes(id)?'저장 해제':'이 기기에 가게 저장';};
+  $('detail-dialog').showModal();
+}
 function toggleSaved(id){
   if(saved.includes(id))savedPlaces=savedPlaces.filter(p=>p.id!==id);
   else{const p=realPlaces.find(p=>p.id===id);if(p)savedPlaces.push(p);}

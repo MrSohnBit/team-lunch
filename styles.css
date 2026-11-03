@@ -16,3 +16,7 @@
 .area-save-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid #dce3d8}.area-save-actions span{font-size:12px;color:#61705d;margin-right:auto}.area-save-actions .primary-button{padding:10px 16px;min-height:44px;font-size:13px}
 
 .card-main{text-decoration:none;color:inherit}.search-feedback{margin:16px 0;padding:14px;border:1px solid #dce3d8;border-radius:14px}.search-feedback label{display:block;font-size:12px;margin-bottom:8px}.search-feedback label span{color:#6e786c}.search-feedback input{width:100%;box-sizing:border-box;border:1px solid #dce3d8;border-radius:8px;padding:10px;font:inherit;background:white}.search-feedback p{font-size:12px;color:#61705d;margin:8px 0 0}.menu-name{overflow-wrap:anywhere}
+
+.card-naver-link{display:block;margin:0 16px 12px;text-align:right;font-size:12px;color:#315940;text-decoration:underline;text-underline-offset:3px}.place-facts{display:grid;grid-template-columns:72px 1fr;gap:12px 10px;font-size:14px;line-height:1.6;margin:24px 0}.place-facts dt{color:#6b7868}.place-facts dd{margin:0;overflow-wrap:anywhere}.detail-link{text-align:center;text-decoration:none;box-sizing:border-box;display:block}.detail-link+.detail-link{margin-top:10px}
+
+#detail-content .detail-art{height:76px;font-size:42px;margin-bottom:20px}
