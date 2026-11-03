@@ -39,6 +39,7 @@ $('sort').value=state.sort;
 $('demo-toggle').checked=state.demo;
 let map, circle, centerMarker, rectangle, handles = [], markers = [], mapFailed = false, mapTimer, toastTimer;
 let areaMode = false;
+let areaMover, areaDragStart, areaMapDraggable;
 let locationGeneration = 0;
 $('location-label').textContent = restoredPreferences.center ? '지난번 선택한 위치' : config.initialLocationLabel;
 const categories = [['전체','✦'],['한식','🍚'],['일식','🍜'],['중식','🥟'],['양식','🍝'],['샐러드','🥗'],['분식','🍙']];
@@ -115,7 +116,7 @@ for(const dialog of document.querySelectorAll('dialog'))dialog.addEventListener(
 function setView(view){state.view=view;for(const key of ['explore','saved']){const el=$('nav-'+key),active=view===key;el.classList.toggle('active',active);if(active)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');}render();if(view==='saved')$('results').scrollIntoView({behavior:'smooth',block:'start'});else window.scrollTo({top:0,behavior:'smooth'});}
 $('nav-explore').onclick=()=>setView('explore');$('nav-saved').onclick=()=>setView('saved');
 $('recommend').onclick=()=>{const chosen=pickPlaces(currentPlaces());if(!chosen.length)return;renderCards(chosen);$('list-title').innerHTML=`오늘의 추천 <span id="result-count">${chosen.length}</span>`;$('active-filters').textContent+=' · 조건 안에서 무작위 추천';renderMap(chosen);$('results').scrollIntoView({behavior:'smooth',block:'start'});toast(`${chosen.length}개의 예시 메뉴를 골랐어요. 필터를 바꾸면 전체 목록으로 돌아가요.`);};
-function clearArea(){areaMode=false;state.bounds=null;if(rectangle){rectangle.setMap(null);rectangle=null;}handles.forEach(h=>{naver.maps.Event.clearInstanceListeners(h);h.setMap(null);});handles=[];$('radius-mode').classList.add('active');$('radius-mode').setAttribute('aria-pressed','true');$('area-mode').classList.remove('active');$('area-mode').setAttribute('aria-pressed','false');$('area-help').hidden=true;$('radius-presets').hidden=false;}
+function clearArea(){if(areaMapDraggable!==undefined){map.setOptions('draggable',areaMapDraggable);areaMapDraggable=undefined;}areaDragStart=null;if(areaMover){naver.maps.Event.clearInstanceListeners(areaMover);areaMover.setMap(null);areaMover=null;}areaMode=false;state.bounds=null;if(rectangle){rectangle.setMap(null);rectangle=null;}handles.forEach(h=>{naver.maps.Event.clearInstanceListeners(h);h.setMap(null);});handles=[];$('radius-mode').classList.add('active');$('radius-mode').setAttribute('aria-pressed','true');$('area-mode').classList.remove('active');$('area-mode').setAttribute('aria-pressed','false');$('area-help').hidden=true;$('radius-presets').hidden=false;}
 $('radius-mode').onclick=()=>{clearArea();render();};
 $('area-mode').onclick=()=>selectArea();
 function selectArea(restoredBounds=null){
@@ -125,10 +126,31 @@ function selectArea(restoredBounds=null){
   const c=map.getCenter(),lat=c.lat(),lng=c.lng();state.center={lat,lng};locationGeneration++;$('location-label').textContent='지도에서 선택한 위치';
   const n=naver.maps;rectangle=new n.Rectangle({map,bounds:new n.LatLngBounds(new n.LatLng(restoredBounds?.south??lat-.0015,restoredBounds?.west??lng-.002),new n.LatLng(restoredBounds?.north??lat+.0015,restoredBounds?.east??lng+.002)),strokeColor:'#315940',strokeWeight:2,fillColor:'#9cbb71',fillOpacity:.18});
   const positions=[new n.LatLng(restoredBounds?.south??lat-.0015,restoredBounds?.west??lng-.002),new n.LatLng(restoredBounds?.north??lat+.0015,restoredBounds?.east??lng+.002)];
-  handles=positions.map((position,index)=>{const handle=new n.Marker({map,position,draggable:true,title:index?'북동쪽 꼭짓점':'남서쪽 꼭짓점',icon:{content:'<span class="area-handle"></span>',anchor:new n.Point(12,12)}});n.Event.addListener(handle,'dragend',updateArea);return handle;});
+  handles=positions.map((position,index)=>{const handle=new n.Marker({map,position,draggable:true,zIndex:1001,title:index?'북동쪽 꼭짓점':'남서쪽 꼭짓점',icon:{content:'<span class="area-handle"></span>',anchor:new n.Point(12,12)}});n.Event.addListener(handle,'dragend',updateArea);return handle;});
+  areaMover=new n.Marker({map,position:new n.LatLng(lat,lng),draggable:true,zIndex:1000,title:'선택 영역 이동'});
+  n.Event.addListener(areaMover,'dragstart',()=>{areaDragStart={...state.bounds};areaMapDraggable=map.getOptions('draggable');map.setOptions('draggable',false);});
+  n.Event.addListener(areaMover,'drag',moveArea);
+  n.Event.addListener(areaMover,'dragend',()=>{moveArea();areaDragStart=null;if(areaMapDraggable!==undefined)map.setOptions('draggable',areaMapDraggable);areaMapDraggable=undefined;updateArea();});
   $('radius-mode').classList.remove('active');$('radius-mode').setAttribute('aria-pressed','false');$('area-mode').classList.add('active');$('area-mode').setAttribute('aria-pressed','true');$('area-help').hidden=false;$('radius-presets').hidden=true;updateArea();
 };
-function updateArea(){if(handles.length!==2)return;const [a,b]=handles.map(h=>({lat:h.getPosition().lat(),lng:h.getPosition().lng()}));state.bounds=normalizedBounds(a,b);const r=state.bounds;rectangle.setBounds(new naver.maps.LatLngBounds(new naver.maps.LatLng(r.south,r.west),new naver.maps.LatLng(r.north,r.east)));render();}
+function syncAreaMover(){
+  if(!areaMover||!state.bounds||areaDragStart)return;
+  const n=naver.maps,b=state.bounds,projection=map.getProjection();
+  const nw=new n.LatLng(b.north,b.west),se=new n.LatLng(b.south,b.east);
+  const a=projection.fromCoordToOffset(nw),z=projection.fromCoordToOffset(se);
+  const width=Math.max(1,Math.abs(z.x-a.x)),height=Math.max(1,Math.abs(z.y-a.y));
+  areaMover.setPosition(nw);
+  areaMover.setIcon({content:`<div class="area-move-surface" style="width:${width}px;height:${height}px;cursor:move;background:rgba(0,0,0,0.001)"></div>`,anchor:new n.Point(0,0)});
+}
+function moveArea(){
+  if(!areaDragStart||!areaMover||handles.length!==2)return;
+  const n=naver.maps,p=areaMover.getPosition(),b=areaDragStart;
+  const south=p.lat()-(b.north-b.south),east=p.lng()+(b.east-b.west);
+  handles[0].setPosition(new n.LatLng(south,p.lng()));
+  handles[1].setPosition(new n.LatLng(p.lat(),east));
+  rectangle.setBounds(new n.LatLngBounds(handles[0].getPosition(),handles[1].getPosition()));
+}
+function updateArea(){if(handles.length!==2)return;const [a,b]=handles.map(h=>({lat:h.getPosition().lat(),lng:h.getPosition().lng()}));state.bounds=normalizedBounds(a,b);const r=state.bounds;rectangle.setBounds(new naver.maps.LatLngBounds(new naver.maps.LatLng(r.south,r.west),new naver.maps.LatLng(r.north,r.east)));syncAreaMover();render();}
 $('search-here').onclick=()=>{if(!map||mapFailed)return;locationGeneration++;clearArea();const c=map.getCenter();state.center={lat:c.lat(),lng:c.lng()};$('location-label').textContent='지도에서 선택한 위치';render();toast('이 위치를 기준으로 메뉴를 찾았어요.');};
 $('location').onclick=()=>{locationGeneration++;clearArea();state.center={...config.initialCenter};$('location-label').textContent=config.initialLocationLabel;if(map&&!mapFailed){map.setCenter(new naver.maps.LatLng(state.center.lat,state.center.lng));map.setZoom(15);}render();toast('기본 위치인 서울시청으로 돌아왔어요.');};
 $('my-location').onclick=()=>{
@@ -147,6 +169,7 @@ function initializeNaverMap(){
   try{
     const n=window.naver.maps;
     map=new n.Map('map',{center:new n.LatLng(state.center.lat,state.center.lng),zoom:15,minZoom:7,maxZoom:20,zoomControl:false,scaleControl:true,mapDataControl:true,logoControl:true});
+    n.Event.addListener(map,'zoom_changed',syncAreaMover);
     circle=new n.Circle({map,center:new n.LatLng(state.center.lat,state.center.lng),radius:state.radius,fillColor:'#9cbb71',fillOpacity:.12,strokeColor:'#7b9e58',strokeWeight:1,strokeOpacity:.6});
     centerMarker=new n.Marker({map,position:new n.LatLng(state.center.lat,state.center.lng),title:'검색 기준점',icon:{content:'<span class="center-pin"></span>',anchor:new n.Point(9,9)}});
     clearTimeout(mapTimer);$('map-placeholder').hidden=true;$('map-controls').hidden=false;
