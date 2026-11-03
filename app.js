@@ -44,7 +44,7 @@ function persistPreferences(){
   return ok;
 }
 $('query').value=state.query;
-$('sort').value=state.sort;
+
 
 let map, circle, centerMarker, markers = [], mapFailed = false, mapTimer, toastTimer;
 let areaController;
@@ -83,9 +83,9 @@ function render() {
   const places = currentPlaces();
   $('list-title').innerHTML = `${state.view === 'saved' ? '저장한 식당' : '이 근처 점심'} <span id="result-count">${places.length}</span>`;
   $('list-eyebrow').textContent=state.view==='saved'?'SAVED ON THIS DEVICE':'LUNCH PICKS';
-  $('active-filters').textContent = `${state.areas.length ? `선택 영역 ${state.areas.length}개` : '반경 '+distance(state.radius)} · ${state.category} · ${state.maxPrice === null ? '가격은 네이버에서 확인' : money(state.maxPrice)+' 이하'}${state.view === 'saved' ? ' · 이 기기에만 저장' : ''}`;
+  $('active-filters').textContent = `${state.areas.length ? `선택 영역 ${state.areas.length}개` : '반경 '+distance(state.radius)} · ${state.category}${state.query?' · '+state.query:''}${state.view === 'saved' ? ' · 이 기기에만 저장' : ''}`;
   $('scope-label').textContent = state.areas.length ? `영역 ${state.areas.length}개` : `반경 ${distance(state.radius)}`;
-  $('filter-dot').hidden = state.maxPrice === null && state.radius === 500;
+  $('filter-dot').hidden=state.radius===500&&state.category==='전체'&&!state.query&&!state.areas.length;
   document.querySelectorAll('[data-category]').forEach(el => {const active=el.dataset.category===state.category;el.classList.toggle('active',active);el.setAttribute('aria-pressed',active);});
   document.querySelectorAll('[data-radius]').forEach(el => {const active=Number(el.dataset.radius)===state.radius;el.classList.toggle('active',active);el.setAttribute('aria-pressed',active);});
   $('empty-title').textContent=searchError?'검색 연결을 확인해 주세요':searchStatus.includes('찾고')?'식당을 찾고 있어요':'선택 범위에 검색된 식당이 없어요';
@@ -122,20 +122,30 @@ $('retry-search').onclick=()=>{scheduleSearch(true);render();};
 $('cards').onclick=event => { const detail=event.target.closest('[data-detail]'),save=event.target.closest('[data-save]'); if(detail)openDetail(detail.dataset.detail);if(save)toggleSaved(save.dataset.save); };
 $('categories').onclick=event => {const btn=event.target.closest('[data-category]');if(btn){state.category=btn.dataset.category;render();}};
 $('query').oninput=event => {state.query=event.target.value;render();};
-$('sort').onchange=event => {state.sort=event.target.value;render();};
 
-function openFilters(){document.querySelectorAll('[name=budget]').forEach(input=>input.checked=input.value===String(state.maxPrice??''));$('radius-slider').value=state.radius;$('radius-output').textContent=distance(state.radius);$('radius-field').hidden=!!state.areas.length;$('filter-dialog').showModal();}
+
+function openFilters(){
+  $('filter-category').value=state.category;$('filter-query').value=state.query;
+  $('radius-slider').value=state.radius;$('radius-output').textContent=distance(state.radius);
+  $('radius-field').hidden=!!state.areas.length;$('filter-area-note').hidden=!state.areas.length;
+  $('filter-area-note').textContent=`지도에서 선택한 자유형 영역 ${state.areas.length}개 안에서 검색해요. 범위는 지도에서 수정할 수 있어요.`;
+  $('filter-dialog').showModal();
+}
 $('open-filters').onclick=openFilters;$('fine-radius').onclick=openFilters;
 $('radius-slider').oninput=event=>$('radius-output').textContent=distance(Number(event.target.value));
-$('clear-draft').onclick=()=>{document.querySelector('[name=budget][value=""]').checked=true;$('radius-slider').value=500;$('radius-output').textContent='500m';};
-$('filter-form').onsubmit=()=>{const value=new FormData($('filter-form')).get('budget');state.maxPrice=value?Number(value):null;state.radius=Number($('radius-slider').value);render();};
+$('clear-draft').onclick=()=>{$('filter-category').value='전체';$('filter-query').value='';$('radius-slider').value=500;$('radius-output').textContent='500m';};
+$('filter-form').onsubmit=()=>{
+  state.category=$('filter-category').value;state.query=$('filter-query').value.trim();$('query').value=state.query;
+  if(!state.areas.length)state.radius=Number($('radius-slider').value);
+  render();
+};
 $('radius-presets').onclick=event=>{const btn=event.target.closest('[data-radius]');if(btn){state.radius=Number(btn.dataset.radius);render();}};
 function resetFilters(){state.radius=500;state.category='전체';state.maxPrice=null;state.query='';$('query').value='';clearArea();render();}
 $('reset-filters').onclick=resetFilters;
 $('reset-guest-settings').onclick=()=>{
   locationGeneration++;clearArea();
   Object.assign(state,{center:{...config.initialCenter},radius:500,category:'전체',maxPrice:null,query:'',sort:'distance',demo:false});
-  $('query').value='';$('sort').value='distance';
+  $('query').value='';
   $('location-label').textContent=config.initialLocationLabel;
   if(map&&!mapFailed){map.setCenter(new naver.maps.LatLng(state.center.lat,state.center.lng));map.setZoom(15);}
   render();toast('저장된 게스트 설정을 기본값으로 초기화했어요.');
