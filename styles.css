@@ -6,3 +6,5 @@
 @media(max-width:360px){.category-list{margin-right:-16px;padding-right:16px}}
 
 .guest-storage{margin:24px 0;padding:16px;border-top:1px solid #dce3d8;color:#647064;font-size:12px;line-height:1.7}.guest-storage p{margin:0 0 8px}.guest-storage button{font-size:12px}
+
+.area-list,.area-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}.area-list button.active{background:#315940;color:white}.area-actions span{font-size:12px;color:#647064}.area-move-surface{cursor:move;background:rgba(0,0,0,.001)}.area-number{display:inline-grid;place-items:center;min-width:22px;height:22px;background:#315940;color:white;border-radius:6px;font-size:12px;margin:4px;pointer-events:none}#area-help{line-height:1.6}#area-tools{width:100%}

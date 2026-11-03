@@ -1,6 +1,7 @@
-import { readPreferences, writePreferences } from './preferences.js?v=20261103-cookie1';
+import { createAreaController } from './areas.js?v=20261103-multi1';
+import { readPreferences, writePreferences } from './preferences.js?v=20261103-multi1';
 import { config } from './config.js?v=20261103-map1';
-import { demoPlaces, filterPlaces, pickPlaces, normalizedBounds } from './domain.js';
+import { demoPlaces, filterPlaces, pickPlaces } from './domain.js?v=20261103-multi1';
 const $ = id => document.getElementById(id);
 const paths = {
   user:'M20 21v-2a7 7 0 0 0-14 0v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8',
@@ -26,6 +27,8 @@ let saved = [];
 try { const data = JSON.parse(localStorage.getItem('team-lunch.saved.v1') || '[]'); if (Array.isArray(data)) saved = data.filter(id => demoPlaces.some(p => p.id === id)); } catch { /* Storage may be disabled. */ }
 const restoredPreferences = readPreferences(document);
 const state = { center: {...config.initialCenter},radius:500,category:'전체',maxPrice:null,query:'',sort:'distance',bounds:null,demo:true,view:'explore', ...restoredPreferences };
+state.areas=restoredPreferences.areas??(restoredPreferences.bounds?[restoredPreferences.bounds]:[]);
+state.bounds=null;
 let lastPreferences = '';
 function persistPreferences(){
   const value=JSON.stringify(state);
@@ -37,9 +40,8 @@ function persistPreferences(){
 $('query').value=state.query;
 $('sort').value=state.sort;
 $('demo-toggle').checked=state.demo;
-let map, circle, centerMarker, rectangle, handles = [], markers = [], mapFailed = false, mapTimer, toastTimer;
-let areaMode = false;
-let areaMover, areaDragStart, areaMapDraggable;
+let map, circle, centerMarker, markers = [], mapFailed = false, mapTimer, toastTimer;
+let areaController;
 let locationGeneration = 0;
 $('location-label').textContent = restoredPreferences.center ? '지난번 선택한 위치' : config.initialLocationLabel;
 const categories = [['전체','✦'],['한식','🍚'],['일식','🍜'],['중식','🥟'],['양식','🍝'],['샐러드','🥗'],['분식','🍙']];
@@ -57,8 +59,8 @@ function render() {
   const places = currentPlaces();
   $('list-title').innerHTML = `${state.view === 'saved' ? '저장한 메뉴' : '이 근처 점심'} <span id="result-count">${places.length}</span>`;
   $('list-eyebrow').textContent=state.view==='saved'?'SAVED ON THIS DEVICE':'LUNCH PICKS';
-  $('active-filters').textContent = `${state.bounds ? '선택 영역' : '반경 '+distance(state.radius)} · ${state.category} · ${state.maxPrice === null ? '예산 전체' : money(state.maxPrice)+' 이하'}${state.view === 'saved' ? ' · 이 기기에만 저장' : ''}`;
-  $('scope-label').textContent = state.bounds ? '선택한 영역' : `반경 ${distance(state.radius)}`;
+  $('active-filters').textContent = `${state.areas.length ? `선택 영역 ${state.areas.length}개` : '반경 '+distance(state.radius)} · ${state.category} · ${state.maxPrice === null ? '예산 전체' : money(state.maxPrice)+' 이하'}${state.view === 'saved' ? ' · 이 기기에만 저장' : ''}`;
+  $('scope-label').textContent = state.areas.length ? `영역 ${state.areas.length}개` : `반경 ${distance(state.radius)}`;
   $('filter-dot').hidden = state.maxPrice === null && state.radius === 500;
   document.querySelectorAll('[data-category]').forEach(el => {const active=el.dataset.category===state.category;el.classList.toggle('active',active);el.setAttribute('aria-pressed',active);});
   document.querySelectorAll('[data-radius]').forEach(el => {const active=Number(el.dataset.radius)===state.radius;el.classList.toggle('active',active);el.setAttribute('aria-pressed',active);});
@@ -73,11 +75,11 @@ function renderMap(places) {
     const marker=new naver.maps.Marker({map,position:new naver.maps.LatLng(place.lat,place.lng),title:`예시: ${place.name}`,icon:{content:`<span class="map-pin">${escape(place.menu)} · ${money(place.price)}</span>`,anchor:new naver.maps.Point(55,18)}});
     naver.maps.Event.addListener(marker,'click',() => openDetail(place.id)); markers.push(marker);
   }
-  circle.setMap(state.bounds ? null : map); circle.setCenter(new naver.maps.LatLng(state.center.lat,state.center.lng)); circle.setRadius(state.radius);
-  centerMarker.setPosition(new naver.maps.LatLng(state.center.lat,state.center.lng));centerMarker.setMap(state.bounds?null:map);
+  circle.setMap(state.areas.length ? null : map); circle.setCenter(new naver.maps.LatLng(state.center.lat,state.center.lng)); circle.setRadius(state.radius);
+  centerMarker.setPosition(new naver.maps.LatLng(state.center.lat,state.center.lng));centerMarker.setMap(state.areas.length?null:map);
 }
 function openDetail(id) {
-  const place = filterPlaces(demoPlaces,{...state,radius:Infinity,bounds:null,query:'',category:'전체',maxPrice:null}).find(p => p.id===id);
+  const place = filterPlaces(demoPlaces,{...state,radius:Infinity,bounds:null,areas:[],query:'',category:'전체',maxPrice:null}).find(p => p.id===id);
   if (!place) return;
   $('detail-content').innerHTML=`<div class="detail-art ${place.tone}" aria-hidden="true">${place.emoji}</div><p class="eyebrow">${place.category} · 가상 식당 예시</p><h2 id="detail-title">${escape(place.name)}</h2><p class="detail-note">${escape(place.note)}</p><div class="detail-meta"><span>${escape(place.menu)}</span><span class="detail-price">${money(place.price)}</span></div><p class="muted">검색 기준점에서 직선 ${distance(place.distance)}</p><p class="detail-caveat">화면을 체험하기 위한 가상 식당과 예시 가격입니다. 실제 방문 정보가 아니에요.</p><button class="primary-button full-width" id="detail-save">${saved.includes(id)?'저장 해제':'이 기기에 메뉴 저장'}</button><button class="secondary-button full-width" id="detail-review">부서 리뷰 · 준비 중</button>`;
   $('detail-save').onclick=() => { toggleSaved(id); $('detail-save').textContent=saved.includes(id)?'저장 해제':'이 기기에 메뉴 저장'; };
@@ -94,7 +96,7 @@ $('categories').onclick=event => {const btn=event.target.closest('[data-category
 $('query').oninput=event => {state.query=event.target.value;render();};
 $('sort').onchange=event => {state.sort=event.target.value;render();};
 $('demo-toggle').onchange=event => {state.demo=event.target.checked;render();};
-function openFilters(){document.querySelectorAll('[name=budget]').forEach(input=>input.checked=input.value===String(state.maxPrice??''));$('radius-slider').value=state.radius;$('radius-output').textContent=distance(state.radius);$('radius-field').hidden=!!state.bounds;$('filter-dialog').showModal();}
+function openFilters(){document.querySelectorAll('[name=budget]').forEach(input=>input.checked=input.value===String(state.maxPrice??''));$('radius-slider').value=state.radius;$('radius-output').textContent=distance(state.radius);$('radius-field').hidden=!!state.areas.length;$('filter-dialog').showModal();}
 $('open-filters').onclick=openFilters;$('fine-radius').onclick=openFilters;
 $('radius-slider').oninput=event=>$('radius-output').textContent=distance(Number(event.target.value));
 $('clear-draft').onclick=()=>{document.querySelector('[name=budget][value=""]').checked=true;$('radius-slider').value=500;$('radius-output').textContent='500m';};
@@ -116,41 +118,26 @@ for(const dialog of document.querySelectorAll('dialog'))dialog.addEventListener(
 function setView(view){state.view=view;for(const key of ['explore','saved']){const el=$('nav-'+key),active=view===key;el.classList.toggle('active',active);if(active)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');}render();if(view==='saved')$('results').scrollIntoView({behavior:'smooth',block:'start'});else window.scrollTo({top:0,behavior:'smooth'});}
 $('nav-explore').onclick=()=>setView('explore');$('nav-saved').onclick=()=>setView('saved');
 $('recommend').onclick=()=>{const chosen=pickPlaces(currentPlaces());if(!chosen.length)return;renderCards(chosen);$('list-title').innerHTML=`오늘의 추천 <span id="result-count">${chosen.length}</span>`;$('active-filters').textContent+=' · 조건 안에서 무작위 추천';renderMap(chosen);$('results').scrollIntoView({behavior:'smooth',block:'start'});toast(`${chosen.length}개의 예시 메뉴를 골랐어요. 필터를 바꾸면 전체 목록으로 돌아가요.`);};
-function clearArea(){if(areaMapDraggable!==undefined){map.setOptions('draggable',areaMapDraggable);areaMapDraggable=undefined;}areaDragStart=null;if(areaMover){naver.maps.Event.clearInstanceListeners(areaMover);areaMover.setMap(null);areaMover=null;}areaMode=false;state.bounds=null;if(rectangle){rectangle.setMap(null);rectangle=null;}handles.forEach(h=>{naver.maps.Event.clearInstanceListeners(h);h.setMap(null);});handles=[];$('radius-mode').classList.add('active');$('radius-mode').setAttribute('aria-pressed','true');$('area-mode').classList.remove('active');$('area-mode').setAttribute('aria-pressed','false');$('area-help').hidden=true;$('radius-presets').hidden=false;}
+function showAreaControls(active=-1){
+  const enabled=state.areas.length>0;
+  $('radius-mode').classList.toggle('active',!enabled);$('radius-mode').setAttribute('aria-pressed',!enabled);
+  $('area-mode').classList.toggle('active',enabled);$('area-mode').setAttribute('aria-pressed',enabled);
+  $('area-help').hidden=!enabled;$('area-tools').hidden=!enabled;$('radius-presets').hidden=enabled;
+  $('area-list').innerHTML=state.areas.map((_,i)=>`<button class="small-button ${i===active?'active':''}" data-area-index="${i}" aria-pressed="${i===active}">영역 ${i+1}</button>`).join('');
+  $('add-area').disabled=state.areas.length>=5;
+  $('remove-area').disabled=active<0;
+}
+function clearArea(){if(areaController)areaController.clear();else{state.areas=[];showAreaControls();}}
 $('radius-mode').onclick=()=>{clearArea();render();};
-$('area-mode').onclick=()=>selectArea();
-function selectArea(restoredBounds=null){
-  if(!map||mapFailed){toast('지도 연결 후 영역을 선택할 수 있어요.');return;}
-  if(areaMode)return;
-  clearArea();areaMode=true;
-  const c=map.getCenter(),lat=c.lat(),lng=c.lng();state.center={lat,lng};locationGeneration++;$('location-label').textContent='지도에서 선택한 위치';
-  const n=naver.maps;rectangle=new n.Rectangle({map,bounds:new n.LatLngBounds(new n.LatLng(restoredBounds?.south??lat-.0015,restoredBounds?.west??lng-.002),new n.LatLng(restoredBounds?.north??lat+.0015,restoredBounds?.east??lng+.002)),strokeColor:'#315940',strokeWeight:2,fillColor:'#9cbb71',fillOpacity:.18});
-  const positions=[new n.LatLng(restoredBounds?.south??lat-.0015,restoredBounds?.west??lng-.002),new n.LatLng(restoredBounds?.north??lat+.0015,restoredBounds?.east??lng+.002)];
-  handles=positions.map((position,index)=>{const handle=new n.Marker({map,position,draggable:true,zIndex:1001,title:index?'북동쪽 꼭짓점':'남서쪽 꼭짓점',icon:{content:'<span class="area-handle"></span>',anchor:new n.Point(12,12)}});n.Event.addListener(handle,'dragend',updateArea);return handle;});
-  areaMover=new n.Marker({map,position:new n.LatLng(lat,lng),draggable:true,zIndex:1000,title:'선택 영역 이동'});
-  n.Event.addListener(areaMover,'dragstart',()=>{areaDragStart={...state.bounds};areaMapDraggable=map.getOptions('draggable');map.setOptions('draggable',false);});
-  n.Event.addListener(areaMover,'drag',moveArea);
-  n.Event.addListener(areaMover,'dragend',()=>{moveArea();areaDragStart=null;if(areaMapDraggable!==undefined)map.setOptions('draggable',areaMapDraggable);areaMapDraggable=undefined;updateArea();});
-  $('radius-mode').classList.remove('active');$('radius-mode').setAttribute('aria-pressed','false');$('area-mode').classList.add('active');$('area-mode').setAttribute('aria-pressed','true');$('area-help').hidden=false;$('radius-presets').hidden=true;updateArea();
-};
-function syncAreaMover(){
-  if(!areaMover||!state.bounds||areaDragStart)return;
-  const n=naver.maps,b=state.bounds,projection=map.getProjection();
-  const nw=new n.LatLng(b.north,b.west),se=new n.LatLng(b.south,b.east);
-  const a=projection.fromCoordToOffset(nw),z=projection.fromCoordToOffset(se);
-  const width=Math.max(1,Math.abs(z.x-a.x)),height=Math.max(1,Math.abs(z.y-a.y));
-  areaMover.setPosition(nw);
-  areaMover.setIcon({content:`<div class="area-move-surface" style="width:${width}px;height:${height}px;cursor:move;background:rgba(0,0,0,0.001)"></div>`,anchor:new n.Point(0,0)});
+function addArea(){
+  if(!map||mapFailed||!areaController){toast('지도 연결 후 영역을 선택할 수 있어요.');return;}
+  if(!state.areas.length){const c=map.getCenter();state.center={lat:c.lat(),lng:c.lng()};locationGeneration++;$('location-label').textContent='지도에서 선택한 위치';}
+  if(!areaController.add())toast('영역은 최대 5개까지 선택할 수 있어요.');
 }
-function moveArea(){
-  if(!areaDragStart||!areaMover||handles.length!==2)return;
-  const n=naver.maps,p=areaMover.getPosition(),b=areaDragStart;
-  const south=p.lat()-(b.north-b.south),east=p.lng()+(b.east-b.west);
-  handles[0].setPosition(new n.LatLng(south,p.lng()));
-  handles[1].setPosition(new n.LatLng(p.lat(),east));
-  rectangle.setBounds(new n.LatLngBounds(handles[0].getPosition(),handles[1].getPosition()));
-}
-function updateArea(){if(handles.length!==2)return;const [a,b]=handles.map(h=>({lat:h.getPosition().lat(),lng:h.getPosition().lng()}));state.bounds=normalizedBounds(a,b);const r=state.bounds;rectangle.setBounds(new naver.maps.LatLngBounds(new naver.maps.LatLng(r.south,r.west),new naver.maps.LatLng(r.north,r.east)));syncAreaMover();render();}
+$('area-mode').onclick=()=>{if(!state.areas.length)addArea();};
+$('add-area').onclick=addArea;
+$('remove-area').onclick=()=>areaController?.remove();
+$('area-list').onclick=event=>{const button=event.target.closest('[data-area-index]');if(button)areaController?.select(Number(button.dataset.areaIndex));};
 $('search-here').onclick=()=>{if(!map||mapFailed)return;locationGeneration++;clearArea();const c=map.getCenter();state.center={lat:c.lat(),lng:c.lng()};$('location-label').textContent='지도에서 선택한 위치';render();toast('이 위치를 기준으로 메뉴를 찾았어요.');};
 $('location').onclick=()=>{locationGeneration++;clearArea();state.center={...config.initialCenter};$('location-label').textContent=config.initialLocationLabel;if(map&&!mapFailed){map.setCenter(new naver.maps.LatLng(state.center.lat,state.center.lng));map.setZoom(15);}render();toast('기본 위치인 서울시청으로 돌아왔어요.');};
 $('my-location').onclick=()=>{
@@ -169,12 +156,13 @@ function initializeNaverMap(){
   try{
     const n=window.naver.maps;
     map=new n.Map('map',{center:new n.LatLng(state.center.lat,state.center.lng),zoom:15,minZoom:7,maxZoom:20,zoomControl:false,scaleControl:true,mapDataControl:true,logoControl:true});
-    n.Event.addListener(map,'zoom_changed',syncAreaMover);
     circle=new n.Circle({map,center:new n.LatLng(state.center.lat,state.center.lng),radius:state.radius,fillColor:'#9cbb71',fillOpacity:.12,strokeColor:'#7b9e58',strokeWeight:1,strokeOpacity:.6});
     centerMarker=new n.Marker({map,position:new n.LatLng(state.center.lat,state.center.lng),title:'검색 기준점',icon:{content:'<span class="center-pin"></span>',anchor:new n.Point(9,9)}});
     clearTimeout(mapTimer);$('map-placeholder').hidden=true;$('map-controls').hidden=false;
     new ResizeObserver(()=>{const el=$('map');map.setSize(new n.Size(el.clientWidth,el.clientHeight));}).observe($('map'));
-    if(state.bounds)selectArea({...state.bounds});else render();
+    const restoredAreas=state.areas.map(b=>({...b}));
+    areaController=createAreaController(map,n,(areas,active)=>{state.areas=areas;showAreaControls(active);render();});
+    if(restoredAreas.length)restoredAreas.forEach(b=>areaController.add(b));else{showAreaControls();render();}
   }catch(error){console.error('Naver map initialization failed', error);mapError('지도를 불러오지 못했어요','잠시 후 다시 시도해 주세요. 메뉴 미리보기는 계속 이용할 수 있어요.');}
 };
 function loadMap(){

@@ -13,6 +13,7 @@ export function sanitizePreferences(value) {
   if (coordinate(value.center)) result.center={lat:value.center.lat,lng:value.center.lng};
   const b=value.bounds;
   if (result.center && b && coordinate({lat:b.south,lng:b.west}) && coordinate({lat:b.north,lng:b.east}) && b.south<b.north && b.west<b.east) result.bounds={south:b.south,north:b.north,west:b.west,east:b.east};
+  if (result.center && Array.isArray(value.areas)) result.areas=value.areas.slice(0,5).filter(b=>b && coordinate({lat:b.south,lng:b.west}) && coordinate({lat:b.north,lng:b.east}) && b.south<b.north && b.west<b.east).map(b=>Object.fromEntries(['south','north','west','east'].map(k=>[k,Number(b[k].toFixed(6))])));
   return result;
 }
 export function readPreferences(doc) {

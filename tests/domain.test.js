@@ -8,3 +8,11 @@ test('radius, category, menu search and inclusive budget intersect',()=>{assert.
 test('dragging either corner across the other preserves inclusive boundaries',()=>{const b=normalizedBounds({lat:1,lng:2},{lat:-1,lng:-2});assert.equal(insideBounds({lat:-1,lng:2},b),true);assert.equal(insideBounds({lat:1.01,lng:0},b),false);assert.deepEqual(filterPlaces(places,{...base,radius:1,bounds:normalizedBounds({lat:-.01,lng:.001},{lat:.01,lng:.004})}).map(p=>p.id),['a','d','b']);});
 test('price sort leaves unknown prices at the end',()=>assert.deepEqual(filterPlaces(places,{...base,sort:'price'}).map(p=>p.id),['a','b','d']));
 test('recommendations are unique, bounded by available candidates and do not mutate input',()=>{const original=structuredClone(places);assert.equal(new Set(pickPlaces(places,3,()=>.5).map(p=>p.id)).size,3);assert.equal(pickPlaces(places.slice(0,1)).length,1);assert.deepEqual(pickPlaces([]),[]);assert.deepEqual(places,original);});
+
+test('multiple areas use union without duplicating overlapping restaurants',()=>{
+  const places=[{id:'a',name:'A',menu:'밥',category:'한식',price:9000,lat:37.5,lng:127},{id:'b',name:'B',menu:'밥',category:'한식',price:11000,lat:37.6,lng:127},{id:'c',name:'C',menu:'밥',category:'한식',price:9000,lat:37.8,lng:127}];
+  const state={center:{lat:37.5,lng:127},radius:10,query:'',category:'전체',maxPrice:null,sort:'distance',areas:[{south:37.49,north:37.51,west:126.9,east:127.1},{south:37.5,north:37.61,west:126.9,east:127.1}]};
+  assert.deepEqual(filterPlaces(places,state).map(p=>p.id),['a','b']);
+  assert.deepEqual(filterPlaces(places,{...state,maxPrice:10000}).map(p=>p.id),['a']);
+  assert.deepEqual(filterPlaces(places,{...state,areas:[state.areas[0]]}).map(p=>p.id),['a']);
+});

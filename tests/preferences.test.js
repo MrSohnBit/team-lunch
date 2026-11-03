@@ -18,3 +18,14 @@ test('tampered values are bounded and invalid geography ignored',()=>{
   assert.deepEqual(sanitizePreferences({version:1,radius:-1,category:'<x>',maxPrice:'10000',sort:'bad',center:{lat:999,lng:0},bounds:{south:2,north:1,west:0,east:1}}),{});
   assert.equal(Array.from(sanitizePreferences({version:1,query:'🍚'.repeat(500)}).query).length,100);
 });
+
+test('multiple areas survive cookies within size limit and invalid areas are dropped',()=>{
+  let raw='';const doc={get cookie(){return raw.split(';')[0]},set cookie(v){raw=v}};
+  const b={south:37.123456789,north:37.124567891,west:126.123456789,east:126.124567891};
+  const state={center:{lat:37.5,lng:127},radius:2000,category:'샐러드',maxPrice:20000,sort:'distance',query:'🍚'.repeat(100),areas:Array.from({length:6},()=>({...b})),demo:true};
+  assert.equal(writePreferences(state,doc,new URL('https://mrsohnbit.github.io/team-lunch/')),true);
+  assert.equal(readPreferences(doc).areas.length,5);
+  assert.equal(readPreferences(doc).areas[0].south,37.123457);
+  assert.ok(raw.length<4096);
+  assert.deepEqual(sanitizePreferences({version:1,center:state.center,areas:[null,{...b,south:99}]}).areas,[]);
+});
